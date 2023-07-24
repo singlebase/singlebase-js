@@ -49,7 +49,6 @@ export  default [
     ],
     output: {
       dir: "./dist/umd",
-      //file: `./dist/singlebase.min.js`,
       format: "umd",
       name: "myLibrary", // this is the name of the global object
       esModule: false,
@@ -64,11 +63,9 @@ export  default [
     output: [
       {
         dir: "./dist/esm",
-        //file: `./dist/${pkg.name}.esm.js`,
         format: "esm",
         exports: "named",
         sourcemap: true,
-        //file: './dist/singlebase.esm.js',
       },
       {
         dir: "./dist/cjs",
