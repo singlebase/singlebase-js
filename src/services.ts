@@ -1,22 +1,10 @@
 import httpx from "./httpx";
-function parseXmlToJson(xml) {
-  const json = {};
-  for (const res of xml.matchAll(/(?:<(\w*)(?:\s[^>]*)*>)((?:(?!<\1).)*)(?:<\/\1>)|<(\w*)(?:\s*)*\/>/gm)) {
-    const key = res[1] || res[3];
-    const value = res[2] && parseXmlToJson(res[2]);
-    json[key] = ((value && Object.keys(value).length) ? value : res[2]) || null;
+import { AuthCredentialsInterface, ResponseType } from "./types";
+import { parseXmlToJson, getKeyFromFilePath } from "./utils";
 
-  }
-  return json;
-}
 
-const getKeyFromFilePath = file_path_or_key => {
-  return file_path_or_key.indexOf('/') >= 0 || file_path_or_key.indexOf('.') >= 0
-    ? file_path_or_key.split('.').slice(0, -1).pop()
-    : file_path_or_key;
-};
 
-export const CollectionService = ($dispatch, collectionName) => {
+export const CollectionService = ($dispatch, collectionName:string) => {
 
   async function dispatch(action: String, opts: Object) {
     return await $dispatch({
@@ -62,21 +50,12 @@ export const CollectionService = ($dispatch, collectionName) => {
       return res
     },
 
-
-
     /**
      * To insert one or multiple document
      * @param {Object|Array} data
      * @returns Response
      */
     async insert(data) {
-      return await this.dispatch('DOC_INSERT', { data })
-    },
-
-    async insertMany(data: Array) {
-      if (!Array.isArray(data)) {
-        throw Error('Invalid datatype')
-      }
       return await this.dispatch('DOC_INSERT', { data })
     },
 
@@ -130,13 +109,28 @@ export const CollectionService = ($dispatch, collectionName) => {
 export const AuthService = ($dispatch) => {
 
   return {
-    async signup(data) {},
+    async signup(credentials: AuthCredentialsInterface): Promise<ResponseType> {
+      return await $dispatch({
+        ...credentials,
+        action: 'AUTH_SIGNUP',
+      })
+    },
 
     async signin() { },
   
-    async signout() { },
+    async signout(id_token) { 
+      return await $dispatch({
+        id_token,
+        action: 'AUTH_SIGNOUT',
+      })      
+    },
   
-    async updateProfile() { },
+    async updateProfile(profile) { 
+      return await $dispatch({
+        data: profile,
+        action: 'AUTH_SIGNOUT',
+      })  
+    },
   
     async updateAccount() { },
   
@@ -265,7 +259,7 @@ export const StorageService = ($dispatch) => {
      * @returns 
      */
     async query(params: object) {
-      if (!params.filters) throw Error("SINGLEBASE:ERROR - storage_query missing 'filters'")
+      if (!params.matches) throw Error("SINGLEBASE:ERROR - storage_query missing '@matches'")
       const resp = await $dispatch({ ...params, action: 'storage_query' });
       return resp.ok ? resp : null;
     }

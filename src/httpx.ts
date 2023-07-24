@@ -1,3 +1,7 @@
+/**
+ * 
+ */
+
 import { isPlainObject } from './utils'
 
 function buildURL(url, query, base=null) {

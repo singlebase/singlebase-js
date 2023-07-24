@@ -1,16 +1,19 @@
 import httpx from './httpx'
 import { CollectionService, AuthService, StorageService } from './services';
+import { ResponseType } from './types';
 import { isPlainObject } from './utils';
+
+
 
 /**
  * Makes the ajax request
  * @param {String} url
  * @param {Object} payload
  * @param {Object} dispatchOptions {headers, transformRequest }
- * @returns {Promise {ok, data, error, meta, xhr, exception}}
+ * @returns {Promise<ResponseType>}
  */
 
-async function request(url, payload={}, dispatchOptions=null) {
+async function request(url, payload={}, dispatchOptions=null): Promise<ResponseType> {
   
   if (!payload.action && !payload.query) {
     throw new Error("Singlebase request payload missing 'action' or 'query'", url, payload);
@@ -85,7 +88,6 @@ export default (url, access_key, options={}) => {
     collection: (collectionName:string) => CollectionService(dispatch, collectionName),
     auth: AuthService(dispatch),
     storage: StorageService(dispatch)
-
   }
 }
 

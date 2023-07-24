@@ -1,8 +1,8 @@
 {
   "name": "@singlebase/singlebase-js",
   "pkgName": "singlebase-js",
-  "version": "0.0.2",
-  "description": "An ambitiously small state management library that follows the Flux pattern.",
+  "version": "0.0.3",
+  "description": "The Javascript SDK library for SinglebaseCloud",
   "main": "dist/umd/index.js",
   "module": "dist/esm/index.js",
   "scripts": {
@@ -25,7 +25,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/singlebasecloud/singlebase-js.git"
+    "url": "git+https://github.com/singlebase/singlebase-js.git"
   },
   "author": {
     "name": "Mardix",
@@ -33,9 +33,9 @@
   },
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/singlebasecloud/singlebase-js/issues"
+    "url": "https://github.com/singlebase/singlebase-js/issues"
   },
-  "homepage": "https://github.com/singlebasecloud/singlebase-js",
+  "homepage": "https://github.com/singlebase/singlebase-js",
   "devDependencies": {
     "@babel/core": "^7.22.9",
     "@babel/preset-env": "^7.22.9",
