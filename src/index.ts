@@ -1,19 +1,21 @@
 import httpx from './httpx'
-import { CollectionService, AuthService, StorageService } from './services';
-import { ResponseType } from './types';
-import { isPlainObject } from './utils';
+import CollectionService from './collection'
+import AuthService from './auth'
+import StorageService from './storage'
 
+import { ResponseType } from './types';
+import { isPlainObject, removeTrailingSlash } from './utils';
 
 
 /**
  * Makes the ajax request
  * @param {String} url
  * @param {Object} payload
- * @param {Object} dispatchOptions {headers, transformRequest }
+ * @param {Object|null} dispatchOptions {headers, transformRequest }
  * @returns {Promise<ResponseType>}
  */
 
-async function request(url, payload={}, dispatchOptions=null): Promise<ResponseType> {
+async function request(url:string, payload:object={}, dispatchOptions:object|null=null): Promise<ResponseType> {
   
   if (!payload.action && !payload.query) {
     throw new Error("Singlebase request payload missing 'action' or 'query'", url, payload);
@@ -58,16 +60,18 @@ async function request(url, payload={}, dispatchOptions=null): Promise<ResponseT
 };
 
 
-export default (url, access_key, options={}) => {
+export default (api_url:string, access_key:string, options:object={}) => {
 
-  async function dispatch(payload, opts) {
-    console.log("DISPATCHER", url, access_key, options)
+  async function dispatch(payload:object, opts:object) {
+
     const _opts = {
       ...(isPlainObject(opts) ? {...opts} : {}),
       ...options
     }
 
-    let headers = { "X-SINGLEBASE-ACCESS-KEY": access_key }
+    let headers = { 
+      "X-SINGLEBASE-ACCESS-KEY": access_key 
+    }
 
     if (_opts?.headers && isPlainObject(_opts?.headers)) {
       headers = {
@@ -80,14 +84,15 @@ export default (url, access_key, options={}) => {
       ...opts,
       headers,
     }
-    return await request(url, payload, dispatchOptions)
+
+    return await request(api_url, payload, dispatchOptions)
   }
 
   return {
     dispatch,
-    collection: (collectionName:string) => CollectionService(dispatch, collectionName),
-    auth: AuthService(dispatch),
-    storage: StorageService(dispatch)
+    collection: (collectionName:string) => new CollectionService(dispatch, collectionName),
+    auth: new AuthService(dispatch),
+    storage: new StorageService(dispatch)
   }
 }
 

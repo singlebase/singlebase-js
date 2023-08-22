@@ -48,8 +48,20 @@ export function parseXmlToJson(xml) {
   return json;
 }
 
-export const getKeyFromFilePath = file_path_or_key => {
-  return file_path_or_key.indexOf('/') >= 0 || file_path_or_key.indexOf('.') >= 0
-    ? file_path_or_key.split('.').slice(0, -1).pop()
-    : file_path_or_key;
+export const getKeyFromFilePath = file_url_or_key => {
+  if (file_url_or_key.indexOf('/') >= 0) {
+    file_url_or_key = file_url_or_key.split('/').pop()
+    if (file_url_or_key.indexOf('--') >= 0) {
+      file_url_or_key = file_url_or_key.split("--")[0]
+    }
+  }
+  if (file_url_or_key.indexOf('.') >= 0) {
+    return file_url_or_key.split(".")[0]
+  }
+  return file_url_or_key
 };
+
+
+export function removeTrailingSlash(str:string):string {
+  return str.replace(/\/+$/, '');
+}

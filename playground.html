@@ -31,9 +31,23 @@
 
   const singlebase = CreateClient(URL, ACCESS_KEY)
   
-  const { data, error, ok } = await singlebase.collection("waitlist")
-    .fetch({matches: { "**": true}})
-  console.log(data)
+  const collectionName = "waitlist"
+
+  const { data, error, ok } = await singlebase
+    .collection(collectionName)
+    .matches({"count:$gt": 5})
+    .fetch({limit: 5})
+  console.log("ALL", data)
+
+  const d1 = await singlebase
+    .collection(collectionName)
+    .setDoc("2af886843f234301b6eaf6114b119612", {"count:$incr": 1})
+
+  const d = await singlebase
+    .collection(collectionName)
+    .getDoc("2af886843f234301b6eaf6114b119612")
+  
+  console.log(d)
 
 const uploadForm = document.querySelector('.upload')
 uploadForm.addEventListener('submit', async function(e) {

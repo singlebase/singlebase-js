@@ -27,10 +27,6 @@ export interface AuthUserInterface {
   metadata: object
 }
 
-export type AuthTokenType = {
-  id_token: any
-}
-
 export interface AuthCredentialsInterface {
   email?: string;
   username?:string;
@@ -38,4 +34,14 @@ export interface AuthCredentialsInterface {
   display_name?: string;
   otp?:string;
   aud?:string;
+  grant_type?:string;
+  intent?:string;
+  new_email?:string;
+  new_password?:string 
 }
+
+
+export type AuthTokenType = {
+  id_token: any
+}
+

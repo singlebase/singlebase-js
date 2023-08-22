@@ -5,14 +5,21 @@
 
 ---
 
-Service: https://singlebase.cloud 
+Site: https://singlebase.cloud 
 
 Documentation: https://docs.singlebasecloud.com
+
+Javascript SDK Documentation: https://docs.singlebasecloud.com/sdk/javascript
+
+---
 
 ### About SinglebaseCloud
 
 SinglebaseCloud is the next generation backend-as-a-service platform and the ultimate Firebase alternative, that provides a NoSQL Datastore, Authentication, Storage, Search, Images, Analytics. 
+
 It provisions the backend in 30 seconds and you get access via an easy and simple API, using GraphQL, SQL and REST.
+
+Visit https://singlebase.cloud 
 
 ---
 
@@ -41,7 +48,7 @@ yarn add @singlebase/singlebase-js
 ```
 
 
-## Usage 
+## Quick example 
 
 ```js
 
@@ -49,94 +56,30 @@ yarn add @singlebase/singlebase-js
 import createClient from '@singlebase/singlebase-js'
 
 // set API URL and access key
-const API_URL = "https://api-svc.singlebasecloud.com/api"
-const ACCESS_KEY = "xxx-xxx-xx.xxx-xxxx-xxxx-xxxx"
+const API_URL = "https://api-000.singlebasecloud.com/api"
+const ACCESS_KEY = "[[YOUR-ACCESS-KEY]]"
 
 // create a new client with API_URL and ACCESS_KEY
 const singlebase = createClient(API_URL, ACCESS_KEY)
 
-// insert data in the 'articles' collection
-const { data, error } = await articles
+
+// get 5 items from the articles collection
+const { data, error } = await singlebase
     .collection('articles')
-    .insert({
-      title: "Hello world!",
-      content: "This is a content..."
-    })
+    .fetch({limit: 5})
 
-if (error) {
-  console.error('Something went wrong')
+if (data) {
+  for (const article of data) {
+    console.log(article?.title)
+  }
 } else {
-  // #insert return an array of data, get the first one
-  const article = data?.[0]
-  const articleKey = article?._key
-  const articleTitle = article?.title
-
-  console.log("Article Key:", articleKey, articleTitle)
-
+  console.error('Something wrong!')
 }
 
-
 ```
 
 
-## Methods
+## Quick Reference
 
-### Collection/Datastore
+Refer to the doc site for more details please visit https://docs.singlebasecloud.com/sdk/javascript 
 
-
-```
- const singlebase = createClient(API_URL, ACCESS_KEY)
-
- const collection = singlebase.collection(collectionName)
-
-```
-
-Methods:
-
-- `fetch(criterias)` 
-- `fetchOne(_key:str)`
-- `insert`
-- `update`
-- `updateOne(_key:str, data:object)`
-- `delete`
-- `deleteOne(_key:str)`
-- `archive`
-- `archiveOne(_key:str)`
-- `count() -> int`
-
-
-### Auth
-```
- const singlebase = createClient(API_URL, ACCESS_KEY)
-
- const auth = singlebase.auth
-
-```
-
-Methods:
-
-- `signup`
-- `signin`
-- `signout`
-- `updateProfile`
-- `updateAccount`
-- `sendOTP`
-- `verifyIDToken`
-- `authConnect`
-
-### Storage
-
-```
- const singlebase = createClient(API_URL, ACCESS_KEY)
-
- const storage = singlebase.storage
-
-```
-
-Methods:
-
-- `get`
-- `upload`
-- `update`
-- `delete`
-- `query`
