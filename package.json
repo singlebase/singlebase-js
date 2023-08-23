@@ -14,7 +14,8 @@
     "test-0": "jest --verbose ./test/",
     "build-i": "npm run build && npm run size",
     "commit-publish-tag": "cross-var git commit -am '$npm_package_version' && git tag $npm_package_version && git push && git push --tags",
-    "publish-pkg": "cross-var npm run test && npm run build && npm run commit-publish-tag && npm publish --access public && npm run size",
+    "publish-pkg": "cross-var npm run build && npm publish --access public",
+    "publish-pkg2": "cross-var npm run test && npm run build && npm run commit-publish-tag && npm publish --access public && npm run size",
     "test-publish": "cross-var npm run test && npm run build && npm run commit-publish-tag && npm run size"
   },
   "jest": {
