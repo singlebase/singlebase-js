@@ -16,7 +16,6 @@ import { isPlainObject, removeTrailingSlash } from './utils';
  */
 
 async function request(url:string, payload:object={}, dispatchOptions:object|null=null): Promise<ResponseType> {
-  
   if (!payload.action && !payload.query) {
     throw new Error("Singlebase request payload missing 'action' or 'query'", url, payload);
   }

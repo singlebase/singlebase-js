@@ -42,7 +42,7 @@ yarn add @singlebase/singlebase-js
 ```
 <script type="module">
 
-  import createClient from 'https://unpkg.com/@singlebase/singlebase-js'
+  import createClient  from 'https://cdn.jsdelivr.net/npm/@singlebase/singlebase-js/+esm'
 
 </script>
 ```
