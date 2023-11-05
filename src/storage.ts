@@ -15,7 +15,7 @@ export default class {
 
   get(file_path_or_key:string): Promise<ResponseType> {
     const _key = getKeyFromFilePath(file_path_or_key);
-    return this._dispatch({ action: 'STORAGE_GET', _key: _key });
+    return this._dispatch({ action: 'storage.get', _key: _key });
   }
 
   /**
@@ -52,7 +52,7 @@ export default class {
 
     const presignedPost = await this._dispatch({
       ..._opts,
-      action: 'storage_presign_upload',
+      action: 'storage.presign_upload',
       filename: file.name,
       content_type: file.type
     });
@@ -62,7 +62,7 @@ export default class {
       const presigned_data = presignedPost?.data?.presigned_data;
       const file_info = presignedPost?.data?.info;
       const _dispatch = {
-        action: 'storage_postsign_upload',
+        action: 'storage.postsign_upload',
         presigned_data: presigned_data,
         _key: presigned_data?._key
       }
@@ -85,12 +85,12 @@ export default class {
           return [file_info, null]
         } catch (e) {
           const x2j = parseXmlToJson(e.response.data)
-          _dispatch.action = 'storage_upload_error'
+          _dispatch.action = 'storage.upload_error'
           _dispatch.errors = x2j?.Error
           return [null, x2j?.Error]
         }
       } catch (e) {
-        _dispatch.action = 'storage_upload_error'
+        _dispatch.action = 'storage.upload_error'
         _dispatch.errors = { error: "UNDEFINED ERROR" }
       } finally {
         await this._dispatch(_dispatch);
@@ -106,7 +106,7 @@ export default class {
    */
   async delete(file_path_or_key): Promise<boolean> {
     const _key = getKeyFromFilePath(file_path_or_key);
-    const resp = await this._dispatch({ action: 'storage_delete', _key });
+    const resp = await this._dispatch({ action: 'storage.delete', _key });
     return resp.ok;
   }
 
@@ -116,8 +116,8 @@ export default class {
    * @returns 
    */
   query(params: object): Promise<ResponseType> {
-    if (!params.matches) throw Error("SINGLEBASE:ERROR - storage_query missing '@matches'")
-    return this._dispatch({ ...params, action: 'storage_query' });
+    if (!params.matches) throw Error("SINGLEBASE:ERROR - storage.query missing '@matches'")
+    return this._dispatch({ ...params, action: 'storage.query' });
   }
   
 }

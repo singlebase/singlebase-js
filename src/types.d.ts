@@ -1,4 +1,10 @@
 
+export type CreateClientConfigType = {
+  api_url: string,
+  api_key: string, 
+  options?:object|null
+}
+
 export type CreateClientType = {
   dispatch: Function,
   collection: "CollectionService",

@@ -55,12 +55,19 @@ yarn add @singlebase/singlebase-js
 // import the package
 import createClient from '@singlebase/singlebase-js'
 
-// set API URL and access key
-const API_URL = "https://api-000.singlebasecloud.com/api"
-const ACCESS_KEY = "[[YOUR-ACCESS-KEY]]"
+/**
+ * CreateClientConfigType:
+ *    api_url:str     // the api url 
+ *    api_key:str     // your api key
+ *    config?:object  // extra config
+ */
+const SBC_CONFIG = {
+  api_url: "https://xxx-xxx.singlebasecloud.com/api",
+  api_key: "[[YOUR-ACCESS-KEY]]"
+}
 
-// create a new client with API_URL and ACCESS_KEY
-const singlebase = createClient(API_URL, ACCESS_KEY)
+// create a new client with API_URL and API_KEY
+const singlebase = createClient(SBC_CONFIG)
 
 
 // get 5 items from the articles collection

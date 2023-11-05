@@ -3,7 +3,7 @@ import CollectionService from './collection'
 import AuthService from './auth'
 import StorageService from './storage'
 
-import { ResponseType } from './types';
+import { ResponseType, CreateClientConfigType } from './types';
 import { isPlainObject, removeTrailingSlash } from './utils';
 
 
@@ -59,17 +59,22 @@ async function request(url:string, payload:object={}, dispatchOptions:object|nul
 };
 
 
-export default (api_url:string, access_key:string, options:object={}) => {
 
-  async function dispatch(payload:object, opts:object) {
+export default (config:CreateClientConfigType) => {
 
+  async function dispatch(payload:object, opts:object={}) {
+
+    const api_url = config.api_url
+    const api_key = config.api_key
+    const options = config.options || {}
+    
     const _opts = {
       ...(isPlainObject(opts) ? {...opts} : {}),
       ...options
     }
 
     let headers = { 
-      "X-SINGLEBASE-ACCESS-KEY": access_key 
+      "x-api-key": api_key
     }
 
     if (_opts?.headers && isPlainObject(_opts?.headers)) {
@@ -79,7 +84,8 @@ export default (api_url:string, access_key:string, options:object={}) => {
       }
       delete _opts.headers;
     }
-    const dispatchOptions = {
+
+    const dispatchOptions:object = {
       ...opts,
       headers,
     }

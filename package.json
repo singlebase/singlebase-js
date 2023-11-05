@@ -1,7 +1,7 @@
 {
   "name": "@singlebase/singlebase-js",
   "pkgName": "singlebase-js",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "description": "The Javascript SDK library for SinglebaseCloud",
   "main": "dist/umd/index.js",
   "module": "dist/esm/index.js",
@@ -20,9 +20,6 @@
   },
   "jest": {
     "testRegex": "(/__tests__/.*|(\\.|/)(test|spec))\\.jsx?$"
-  },
-  "engines": {
-    "node": ">=20.0.0"
   },
   "repository": {
     "type": "git",

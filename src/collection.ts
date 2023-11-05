@@ -33,7 +33,7 @@ class BaseCollection {
     if (!_payload?.matches) {
       _payload.matches = {"**": true}
     }
-    return await this.dispatch('doc_fetch', _payload)
+    return await this.dispatch('db.fetch', _payload)
   }
 
   /**
@@ -74,7 +74,7 @@ class BaseCollection {
     }
     if (!isPlainObject(_payload?.matches)) throw new Error("Missing criteria @matches")
     if (!isPlainObject(_payload?.data)) throw new Error("Missing @data")
-    return await this.dispatch('doc_update', { ..._payload })
+    return await this.dispatch('db.update', { ..._payload })
   }
 
   async upsert(criteria: object) {
@@ -83,7 +83,7 @@ class BaseCollection {
       _payload.matches = this._defaultMatches
     }
     if (!isPlainObject(_payload?.matches)) throw new Error("Missing criteria @matches")
-    return await this.dispatch('doc_update', { ..._payload })
+    return await this.dispatch('db.update', { ..._payload })
   }
 
   async delete(criteria: object) {
@@ -92,7 +92,7 @@ class BaseCollection {
       _payload.matches = this._defaultMatches
     }
     if (!isPlainObject(_payload?.matches)) throw new Error("Missing criteria @matches")
-    return await this.dispatch('DOC_DELETE', { matches: _payload?.matches })
+    return await this.dispatch('db.delete', { matches: _payload?.matches })
   }
 
   async archive(criteria: object) {
@@ -101,7 +101,7 @@ class BaseCollection {
       _payload.matches = this._defaultMatches
     }
     if (!isPlainObject(_payload?.matches)) throw new Error("Missing criteria @matches")
-    return await this.dispatch('DOC_ARCHIVE', { matches: _payload?.matches })
+    return await this.dispatch('db.archive', { matches: _payload?.matches })
   }
 
   async restore(criteria: object) {
@@ -110,7 +110,7 @@ class BaseCollection {
       _payload.matches = this._defaultMatches
     }
     if (!isPlainObject(_payload?.matches)) throw new Error("Missing criteria @matches")
-    return await this.dispatch('DOC_RESTORE', { matches: _payload?.matches })
+    return await this.dispatch('db.restore', { matches: _payload?.matches })
   }
 
   /**
@@ -124,7 +124,7 @@ class BaseCollection {
       _payload.matches = this._defaultMatches
     }
     let matches = isPlainObject(_payload?.matches) ? _payload?.matches : {}
-    const { data, error } = await this.dispatch('DOC_COUNT', { matches })
+    const { data, error } = await this.dispatch('db.count', { matches })
     if (data && data?.count) {
       return data?.count
     }
@@ -140,11 +140,11 @@ export default class extends BaseCollection{
   }
 
   async insert(data: object | [object]) {
-    return await this.dispatch('doc_insert', { data })
+    return await this.dispatch('db.insert', { data })
   }
 
   async search(query: string, opts = {}) {
-    return await this.dispatch('doc_search', { ...opts, query })
+    return await this.dispatch('db.search', { ...opts, query })
   }
 
   /** Single document read/write */
@@ -153,7 +153,7 @@ export default class extends BaseCollection{
   }
 
   async setDoc(_key: string, data: object) {
-    return await this.dispatch('doc_update', { data: {...data, _key} })
+    return await this.dispatch('db.update', { data: {...data, _key} })
   }
 
   async deleteDoc(_key: string) {
@@ -177,7 +177,7 @@ export default class extends BaseCollection{
         throw new Error("SinglebaseClient.collection#[updateMany] - one of more document is missing `_key`")
       }
     }
-    return await this.dispatch('doc_update', {data})
+    return await this.dispatch('db.update', {data})
   }
   
 }
