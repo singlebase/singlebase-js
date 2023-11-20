@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+</head>
+<body>
+  
+  <form class="upload">
+    <input type="file" name="uploadFile" required />
+    <input type="submit" />
+ </form>
+
+ <div>
+
+
+  <input>
+
+ </div>
+  
+<script type="module">
+  //import createClient from './dist/esm/index.js'
+  import createClient  from 'https://cdn.jsdelivr.net/npm/@singlebase/singlebase-js/+esm'
+
+  //const API_URL = "http://127.0.0.1:5000/api"
+  const API_URL = "https://cloud.singlebaseapis.com/api"
+
+  const API_KEY = ""
+
+  const AUTH_STORAGE_KEY = "sbc_pg_auth"
+
+  const SBC_CONFIG = {
+    api_url: API_URL,
+    api_key: API_KEY,
+    options: {
+      headers: {
+          "Authorization": async () => await getAuthBearer(singlebase)
+      }
+    }
+  }
+
+  const singlebase = createClient(SBC_CONFIG)
+
+
+  /**
+   * 
+   * @params data:object
+   */
+  function setAuthSessionToken(data) {
+    const current_time = Date.now() 
+    const token_info = data?.token_info 
+    const expires_at = current_time + (parseInt(token_info?.ttl * 1000))
+    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({...data, expires_at}));
+  }
+
+  /**
+   * 
+   */
+  function getAuthSessionToken() {
+    const data = localStorage.getItem(AUTH_STORAGE_KEY);
+    return JSON.parse(data)
+  }
+
+  async function refreshSessionToken(sbc, refresh_token, id_token) {
+    const creds = {
+      refresh_token,
+      id_token,
+      grant_type: 'refresh_token',
+    }
+    const res = await sbc.auth.signIn(creds)
+    if (res.ok) {
+      setAuthSessionToken(res?.data)
+    }
+  }
+
+  async function getAuthBearer(sbc) {
+    
+    const token = getAuthSessionToken()
+    /**
+     * @object {aud, iat, exp, project_id, ttl}
+     */
+    const token_info = token?.token_info
+    /**
+     * @str
+     */
+    const refresh_token = token?.refresh_token
+    /**
+     * @str
+     */ 
+    const id_token = token?.id_token
+
+    const expires_at = token?.expires_at
+
+    const lapse_time = 120 // time in seconds to live before update
+    const current_time = Date.now() 
+    
+    const diff_time = expires_at - current_time
+    const require_refresh = diff_time < lapse_time
+
+    // if (require_refresh) {
+    //   await refreshSessionToken(sbc, refresh_token, id_token)
+    //   return await getAuthBearer(sbc)
+    // }
+    return `Bearer ${id_token}`    
+  }
+
+
+  async function loginUser(sbc) {
+    const creds = {
+      email: "",
+      password: "",
+      grant_type: 'password',
+      aud: 'web'
+    }
+    const res = await sbc.auth.signIn(creds)
+    if (res.ok) {
+      setAuthSessionToken(res?.data)
+    }
+  }
+
+  async function addTodo(sbc) {
+      const { data, error, ok } = await sbc.collection('todos').insert({
+      task: "Do this....",
+      isDone: true
+    })
+  }
+
+
+  // const collectionName = "waitlist"
+
+  // const { data, error, ok } = await singlebase
+  //   .collection(collectionName)
+  //   .matches({"**": true})
+  //   .fetch()
+
+  console.log("LOGIN...")
+  await loginUser(singlebase)
+
+  //await addTodo(singlebase)
+
+  //console.log("ALL", data)
+
+  // const d1 = await singlebase
+  //   .collection(collectionName)
+  //   .setDoc("2af886843f234301b6eaf6114b119612", {"count:$incr": 1})
+  // console.log("D1", d1)
+
+  // const d2 = await singlebase
+  //   .collection(collectionName)
+  //   .getDoc("2af886843f234301b6eaf6114b119612")
+  
+  // console.log("D2", d2)
+
+const uploadForm = document.querySelector('.upload')
+uploadForm.addEventListener('submit', async function(e) {
+    e.preventDefault()
+    let file = e.target.uploadFile.files[0]
+    const {data, error} = await singlebase.storage.upload(file)
+    if (data) {
+      console.log("FILE UPLOADED", data)
+    } else {
+      console.log("FILE UPDLOAD ERROR", error)
+    }
+})
+
+</script>
+
+</body>
+</html>

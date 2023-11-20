@@ -9,4 +9,4 @@ node_modules
 *.log
 .history
 .venv
-playground.html
+-playground.html

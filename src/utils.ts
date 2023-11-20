@@ -15,7 +15,7 @@ export const isFn = (obj, key) => obj && typeof obj[key] === 'function';
  * @param {*} obj 
  * @returns 
  */
-function deepCopy(obj) {
+export function deepCopy(obj) {
   if (obj === null || typeof obj !== 'object') return obj;
   var temp = obj.constructor();
   for (const key in obj) {
@@ -25,7 +25,7 @@ function deepCopy(obj) {
   return temp;
 }
 
-function deepFreeze(obj) {
+export function deepFreeze(obj) {
   if (obj === null || typeof obj !== 'object') return obj;
   Object.keys(obj).forEach(function(name) {
     const prop = obj[name];

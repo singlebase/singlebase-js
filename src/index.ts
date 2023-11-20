@@ -4,7 +4,7 @@ import AuthService from './auth'
 import StorageService from './storage'
 
 import { ResponseType, CreateClientConfigType } from './types';
-import { isPlainObject, removeTrailingSlash } from './utils';
+import { isPlainObject, removeTrailingSlash, deepCopy } from './utils';
 
 
 /**
@@ -78,8 +78,9 @@ export default (config:CreateClientConfigType) => {
     }
 
     if (_opts?.headers && isPlainObject(_opts?.headers)) {
+      const _headers = _opts?.headers
       headers = {
-        ...opts?.headers,
+        ..._headers,
         ...headers
       }
       delete _opts.headers;

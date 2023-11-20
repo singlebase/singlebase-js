@@ -63,19 +63,18 @@ import createClient from '@singlebase/singlebase-js'
  */
 const SBC_CONFIG = {
   api_url: "https://xxx-xxx.singlebasecloud.com/api",
-  api_key: "[[YOUR-ACCESS-KEY]]"
+  api_key: "[[API-KEY]]"
 }
 
 // create a new client with API_URL and API_KEY
 const singlebase = createClient(SBC_CONFIG)
 
-
 // get 5 items from the articles collection
-const { data, error } = await singlebase
+const { data, error, ok } = await singlebase
     .collection('articles')
     .fetch({limit: 5})
 
-if (data) {
+if (ok) {
   for (const article of data) {
     console.log(article?.title)
   }
