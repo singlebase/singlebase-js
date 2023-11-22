@@ -165,7 +165,7 @@ const uploadForm = document.querySelector('.upload')
 uploadForm.addEventListener('submit', async function(e) {
     e.preventDefault()
     let file = e.target.uploadFile.files[0]
-    const {data, error} = await singlebase.storage.upload(file)
+    const {data, error} = await singlebase.file.upload(file)
     if (data) {
       console.log("FILE UPLOADED", data)
     } else {
