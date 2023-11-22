@@ -3,7 +3,7 @@ import { AuthCredentialsInterface, ResponseType } from "./types";
 import { parseXmlToJson, getKeyFromFilePath, isString, isPlainObject, isEmpty } from "./utils";
 
 /**
- * StorageService
+ * FileService
  * @param this._dispatch 
  * @returns 
  */
@@ -13,9 +13,9 @@ export default class {
     this._dispatch = dispatch
   }
 
-  get(file_path_or_key:string): Promise<ResponseType> {
+  getInfo(file_path_or_key:string): Promise<ResponseType> {
     const _key = getKeyFromFilePath(file_path_or_key);
-    return this._dispatch({ action: 'storage.get', _key: _key });
+    return this._dispatch({ action: 'file.info', _key: _key });
   }
 
   /**
@@ -24,7 +24,7 @@ export default class {
    * @returns string|null
    */
   async getDownloadURL(file_path_or_key:string): Promise<string|null> {
-    const res = await this.get(file_path_or_key)
+    const res = await this.getInfo(file_path_or_key)
     return res.ok ? res?.data?.url : null
   }
 
@@ -52,7 +52,7 @@ export default class {
 
     const presignedPost = await this._dispatch({
       ..._opts,
-      action: 'storage.presign_upload',
+      action: 'file.preupload',
       filename: file.name,
       content_type: file.type
     });
@@ -62,7 +62,7 @@ export default class {
       const presigned_data = presignedPost?.data?.presigned_data;
       const file_info = presignedPost?.data?.info;
       const _dispatch = {
-        action: 'storage.postsign_upload',
+        action: 'file.postupload',
         presigned_data: presigned_data,
         _key: presigned_data?._key
       }
@@ -85,12 +85,12 @@ export default class {
           return [file_info, null]
         } catch (e) {
           const x2j = parseXmlToJson(e.response.data)
-          _dispatch.action = 'storage.upload_error'
+          _dispatch.action = 'file.uploaderror'
           _dispatch.errors = x2j?.Error
           return [null, x2j?.Error]
         }
       } catch (e) {
-        _dispatch.action = 'storage.upload_error'
+        _dispatch.action = 'file.uploaderror'
         _dispatch.errors = { error: "UNDEFINED ERROR" }
       } finally {
         await this._dispatch(_dispatch);
@@ -106,7 +106,7 @@ export default class {
    */
   async delete(file_path_or_key): Promise<boolean> {
     const _key = getKeyFromFilePath(file_path_or_key);
-    const resp = await this._dispatch({ action: 'storage.delete', _key });
+    const resp = await this._dispatch({ action: 'file.delete', _key });
     return resp.ok;
   }
 

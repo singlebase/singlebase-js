@@ -1,7 +1,7 @@
 import httpx from './httpx'
 import CollectionService from './collection'
 import AuthService from './auth'
-import StorageService from './storage'
+import FileService from './file'
 
 import { ResponseType, CreateClientConfigType } from './types';
 import { isPlainObject, removeTrailingSlash, deepCopy } from './utils';
@@ -98,7 +98,7 @@ export default (config:CreateClientConfigType) => {
     dispatch,
     collection: (collectionName:string) => new CollectionService(dispatch, collectionName),
     auth: new AuthService(dispatch),
-    storage: new StorageService(dispatch)
+    storage: new FileService(dispatch)
   }
 }
 

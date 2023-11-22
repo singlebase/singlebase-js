@@ -15,7 +15,7 @@ Javascript SDK Documentation: https://docs.singlebasecloud.com/sdk/javascript
 
 ### About SinglebaseCloud
 
-SinglebaseCloud is the next generation backend-as-a-service platform and the ultimate Firebase alternative, that provides a NoSQL Datastore, Authentication, Storage, Search, Images, Analytics. 
+SinglebaseCloud is the next generation backend-as-a-service platform and the ultimate Firebase alternative, that provides a NoSQL Datastore, Authentication, File Storage, Search, Images, Analytics. 
 
 It provisions the backend in 30 seconds and you get access via an easy and simple API, using GraphQL, SQL and REST.
 
