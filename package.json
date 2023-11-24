@@ -1,7 +1,7 @@
 {
   "name": "@singlebase/singlebase-js",
   "pkgName": "singlebase-js",
-  "version": "0.0.10",
+  "version": "0.0.11",
   "description": "The Javascript SDK library for SinglebaseCloud",
   "main": "dist/umd/index.js",
   "module": "dist/esm/index.js",

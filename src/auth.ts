@@ -7,6 +7,7 @@ export default class {
     signin: 'signin',
     change_email: 'change_email',
     change_password: 'change_password',
+    change_username: 'change_username',
     invite: 'invite'
   }
 
@@ -19,29 +20,37 @@ export default class {
     this._dispatch = $dispatch  
   }
 
-  signUp(credentials: AuthCredentialsInterface): Promise<ResponseType> {
-    return this._dispatch({
+  async signUp(credentials: AuthCredentialsInterface): Promise<ResponseType> {
+    return await this._dispatch({
       ...credentials,
       action: 'auth.signup',
     })
   }
 
-  signIn(credentials: AuthCredentialsInterface): Promise<ResponseType> {
-    return this._dispatch({
+  async signIn(credentials: AuthCredentialsInterface): Promise<ResponseType> {
+    return await this._dispatch({
       ...credentials,
       action: 'auth.signin',
     })
   }
 
-  signOut(id_token:String): Promise<ResponseType> {
-    return this._dispatch({
+  async signOut(id_token:String): Promise<ResponseType> {
+    return await this._dispatch({
       id_token,
       action: 'auth.signout',
     })
   }  
 
-  sendOTP(email:string, intent:string, aud:string|null="user"): Promise<ResponseType> { 
-    return this._dispatch({
+  async refreshToken(refresh_token:String, id_token:String): Promise<ResponseType> {
+    return await this._dispatch({
+      refresh_token,
+      id_token,
+      action: 'auth.signout'
+    })
+  } 
+
+  async sendOTP(email:string, intent:string, aud:string|null="user"): Promise<ResponseType> { 
+    return await this._dispatch({
       action: 'auth.send_otp',
       email,
       intent,
@@ -49,21 +58,19 @@ export default class {
     })
   }
 
-  async getNonce(): Promise<string> {
-    const res = await this._dispatch({ action: 'auth.nonce'})
-    return res.ok ? res?.data?.nonce : null
+  async settings() : Promise<ResponseType> {
+    return await this._dispatch({
+      action: 'auth.settings'
+    })
   }
-
-  // TODO
-  authConnect() { }
 
   /**
    * 
    * @param creds {}
    * @returns 
    */
-  updateProfile(creds:object): Promise<ResponseType> {
-    return this._dispatch({
+  async updateProfile(creds:object): Promise<ResponseType> {
+    return await this._dispatch({
       data: creds,
       action: 'auth.update_profile',
     })
@@ -73,11 +80,33 @@ export default class {
    * @param creds { email, otp, intent, new_email?, new_password? }
    * @returns 
    */
-  updateAccount(creds:object): Promise<ResponseType> { 
-    return this._dispatch({
+  async updateAccount(creds:object): Promise<ResponseType> { 
+    return await this._dispatch({
       ...creds,
       action: 'auth.update_account',
     })      
+  }
+
+
+  async verifyIdToken(id_token:String, aud:string|null="user"): Promise<ResponseType> { 
+    return await this._dispatch({
+      id_token,
+      aud,
+      action: 'auth.update_account',
+    })      
+  }
+
+  // TODO
+  async oauthConnect() { }
+
+
+
+  /** ---------------------------------------------------------------- */
+
+
+  async getNonce(): Promise<string> {
+    const res = await this._dispatch({ action: 'auth.nonce'})
+    return res.ok ? res?.data?.nonce : null
   }
 
   /**
@@ -85,8 +114,8 @@ export default class {
    * @param creds {email, password, display_name?, phone_number?}
    * @returns 
    */
-  createUserWithPassword(creds:object): Promise<ResponseType> {
-    return this.signUp({
+  async createUserWithPassword(creds:object): Promise<ResponseType> {
+    return await this.signUp({
       ...creds
     })
   }
@@ -96,8 +125,8 @@ export default class {
    * @param creds {email, password, otp?}
    * @returns 
    */
-  signInWithPassword(creds:object): Promise<ResponseType> {
-    return this.signIn({
+  async signInWithPassword(creds:object): Promise<ResponseType> {
+    return await this.signIn({
       ...creds,
       grant_type: this.GRANT_TYPES.password
     })
@@ -108,8 +137,8 @@ export default class {
    * @param creds {email, otp}
    * @returns 
    */
-  signInWithOTP(creds:object): Promise<ResponseType> {
-    return this.signIn({
+  async signInWithOTP(creds:object): Promise<ResponseType> {
+    return await this.signIn({
       ...creds,
       grant_type: this.GRANT_TYPES.otp
     })
@@ -120,8 +149,8 @@ export default class {
    * @param creds {email, new_email, otp} 
    * @returns 
    */
-  changeEmail(creds:object): Promise<ResponseType> {
-    return this.signIn({
+  async changeEmail(creds:object): Promise<ResponseType> {
+    return await this.signIn({
       ...creds,
       intent: this.INTENTS.change_email
     })
@@ -132,8 +161,8 @@ export default class {
    * @param creds {email, new_password, otp} 
    * @returns 
    */
-  changePassword(creds:object): Promise<ResponseType> {
-    return this.signIn({
+  async changePassword(creds:object): Promise<ResponseType> {
+    return await this.signIn({
       ...creds,
       intent: this.INTENTS.change_password
     })
