@@ -58,7 +58,7 @@ export default class {
     })
   }
 
-  async settings() : Promise<ResponseType> {
+  async getSettings() : Promise<ResponseType> {
     return await this._dispatch({
       action: 'auth.settings'
     })
@@ -96,17 +96,9 @@ export default class {
     })      
   }
 
-  // TODO
-  async oauthConnect() { }
 
-
-
-  /** ---------------------------------------------------------------- */
-
-
-  async getNonce(): Promise<string> {
-    const res = await this._dispatch({ action: 'auth.nonce'})
-    return res.ok ? res?.data?.nonce : null
+  async getNonce(): Promise<ResponseType> {
+    return await this._dispatch({ action: 'auth.nonce'})
   }
 
   /**
@@ -146,7 +138,7 @@ export default class {
 
   /**
    * 
-   * @param creds {email, new_email, otp} 
+   * @param creds object{email, new_email, otp}
    * @returns 
    */
   async changeEmail(creds:object): Promise<ResponseType> {
@@ -167,5 +159,11 @@ export default class {
       intent: this.INTENTS.change_password
     })
   }
+
+  // TODO
+  async oauthConnect() { }
+
+
+
 }
 
