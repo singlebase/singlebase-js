@@ -21,27 +21,19 @@
   
 <script type="module">
 
-  import createClient from './dist/esm/index.js'
   //import createClient  from 'https://cdn.jsdelivr.net/npm/@singlebase/singlebase-js/+esm'
-
-  const API_URL = "http://127.0.0.1:5000/api"
   // const API_URL = "https://cloud.singlebaseapis.com/api"
+  // const API_KEY = ""
 
+  // local test
+  import createClient from './dist/esm/index.js'
+  const API_URL = "http://127.0.0.1:5000/api"
   const API_KEY = "ni5ibc3ldse4dku9.yF0hnKQDPb54lnn_dDD_6Z1uyd6HsxPVRNxdOm97KtUvq3E68PO2T120CtNntw2Pmd1dQuUfZEJCSip2"
 
-  const AUTH_STORAGE_KEY = "sbc_pg_auth"
-
-  const _EMAIL = ""
-  const _PW = ""
 
   const singlebaseConfig = {
     api_url: API_URL,
-    api_key: API_KEY,
-    options: {
-      headers: {
-          //"Authorization": async () => await getAuthBearer(singlebase)
-      }
-    }
+    api_key: API_KEY
   }
   const client = createClient(singlebaseConfig)
 
