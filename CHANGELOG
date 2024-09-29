@@ -1,5 +1,7 @@
-0.1.0
+0.1.x
 - Updated API
+- Fixed Headers[Authorization]
+
 
 0.0.1
   

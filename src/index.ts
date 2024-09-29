@@ -82,12 +82,9 @@ async function makeRequest(
 
   // Prepare headers with support for dynamic values
   const headers: Record<string, any> = { ...dispatchOptions.headers };
-  for (const [key, value] of Object.entries(headers)) {
-    const _val = isFn(value) ? await value(payload) : value
-    if (_val) {
-      headers[key] = _val
-    }
-  }
+
+  // set Headers Authorization
+  dispatchOptions?.setHeadersAuthorizationBearer?.(headers)
 
   // Transform request data if a transform function is provided
   const data = dispatchOptions.transformRequest
@@ -189,32 +186,41 @@ const createClient = ({
 
   // Merge headers, giving precedence to default headers
   const headers: Record<string, any> = {
-    
-    // X-API-KEY
+    // x-api-key
     'x-api-key': api_key,
 
-    // AUTHORIZATION BEARER 
-    'Authorization': async () => {
-      // only set when auth has been initialized
-      if (clients?.auth !== null) {
-        //const idToken = await getAuth().getIdToken()
-        const idToken = getAuth()?.idToken
-        if (idToken) {
-          return `Bearer ${idToken}`
-        }
-        return null 
-      }
-    },
+    // x-sbc-sdk-client
+    'x-sbc-sdk-client': `singlebase-js@__VERSION__`,
+
+    // authorization 
+    'Authorization': '',
+
     ...(isPlainObject(options.headers) ? options.headers : {}),
   };
 
+  /**
+   * Set the authorization headers
+   * @param headers 
+   */
+  const setHeadersAuthorizationBearer = (headers) => {
+    if (clients?.auth) {
+      //const idToken = await getAuth().getIdToken()
+      const idToken = getAuth()?.idToken; 
+      headers['Authorization'] = idToken ? `Bearer ${idToken}` : ''
+    } else {
+      headers['Authorization'] = ''
+    }
+  }
+
   // Extract transformRequest if provided
   const { transformRequest, ...restOptions } = options;
+
 
   const dispatchOptions: DispatchOptions = {
     ...restOptions,
     headers,
     transformRequest,
+    setHeadersAuthorizationBearer
   };
 
   // Initialize dispatch

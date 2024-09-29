@@ -26,6 +26,8 @@ export interface CredentialsInterface {
 
 export interface UpdateProfileInterface {
   display_name?: string;
+  name?: string;
+  surname?: string;
   phone_number?: string;
   photo_url?:string;
   aud?:string;

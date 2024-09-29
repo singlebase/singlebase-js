@@ -1,30 +1,35 @@
-# Singlebase-js
+# singlebase-js
 
+`singlebase-js` : Javascript/Typescript SDK for Singlebase's API. 
 
-`singlebase-js` is the Javascript SDK for SinglebaseCloud API. 
+Javascript SDK Documentation: https://docs.singlebasecloud.com/sdk/javascript 
 
----
+API Documentation: https://docs.singlebasecloud.com
 
-Site: https://singlebase.cloud 
-
-Documentation: https://docs.singlebasecloud.com
-
-Javascript SDK Documentation: https://docs.singlebasecloud.com/sdk/javascript
+Website: https://singlebase.cloud 
 
 ---
 
 ### About SinglebaseCloud
 
-SinglebaseCloud is the next generation backend-as-a-service platform and the ultimate Firebase alternative, that provides a NoSQL Datastore, Authentication, File Storage, Search, Images, Analytics. 
+SinglebaseCloud is an all-in-one backend-as-a-service (BaaS) platform that provides 
+a developer friendly API to access and manage application data, using REST API, GraphQL, or SQL.
 
-It provisions the backend in 30 seconds and you get access via an easy and simple API, using GraphQL, SQL and REST.
+**Features**:
 
-Visit https://singlebase.cloud 
+- LLM & AI functionalities
+- VectorDB: Vector Database for AI and LLM apps
+- Datastore: NoSQL Document Database
+- Authentication: For authentication
+- Filestore: For file storage
+- Search: For text search and vector search
+- Images: Image service to manipulate image
+
+Learn more: https://singlebase.cloud 
 
 ---
 
 ## Install 
-
 
 ### NPM/Yarn Install
 
@@ -41,9 +46,7 @@ yarn add @singlebase/singlebase-js
 
 ```
 <script type="module">
-
   import createClient  from 'https://cdn.jsdelivr.net/npm/@singlebase/singlebase-js/+esm'
-
 </script>
 ```
 
@@ -61,11 +64,10 @@ import createClient from '@singlebase/singlebase-js'
  * CreateClientConfigType:
  *    api_url:str     // the api url 
  *    api_key:str     // your api key
- *    config?:object  // extra config
  */
 const createClientConfig = {
-  api_url: "https://xxx-xxx.singlebasecloud.com/api",
-  api_key: "[[API-KEY]]"
+  api_url: "https://cloud.singlebaseapis.com/api",
+  api_key: "your-api-key"
 }
 
 /**
@@ -81,12 +83,12 @@ const singlebase = createClient(createClientConfig)
 - singlebase.useDatastore()
 - singlebase.useAuth()
 - singlebase.useFilestore()
-- singlebase.LLM()
+- singlebase.useLLM()
 
 
-// 4.1
-
+// 
 //-- Datastore
+// Datastore is a NoSQL document datastore
 const datastore = singlebase.useDatastore()
 
 // methods
@@ -130,13 +132,27 @@ if (res.ok) {
 }
 
 // -- Authentication
-
 const auth = singlebase.useAuth()
 
+// methods
+- auth.signinWithPassword
+- auth.signUpWithPassword
+- auth.updateAccount // change email, password, username
+- auth.updateProfile // change display_name, photo, metadata, etc..
+- auth.getUser
+- auth.onAuthStateChanged
+
+// example
+const email = "x@y.com"
+const password = "**********"
+const res = await auth.signinWithPassword({email, password})
+if (res.ok) {
+  console.log(`Welcome ${res?.data?.display_name}`)
+}
+
 // -- LLM
-
 const llm = singlebase.useLLM()
-
+// WIP
 
 ```
 

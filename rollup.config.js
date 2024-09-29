@@ -11,29 +11,39 @@
  * > rollup -c
  */
 
-import banner from 'rollup-plugin-banner';
+
 import { nodeResolve } from "@rollup/plugin-node-resolve";
+import replace from '@rollup/plugin-replace';
 import { terser } from "rollup-plugin-terser";
 import babel from "@rollup/plugin-babel";
 import typescript from "rollup-plugin-typescript";
 
 import pkg from "./package.json";
 
-const topBanner = `${pkg.pkgName} ${pkg.version}
-${pkg.homepage}
+const banner = `
+/**
+ * ==
+ * Singlebase.cloud
+ * A backend-as-a-service (BaaS), featuring:
+ * - LLM & AI functionalities
+ * - VectorDB: Vector Database for AI and LLM apps
+ * - Datastore: NoSQL Document Database
+ * - Authentication: For authentication
+ * - Filestore: For file storage
+ * - Search: For text search and vector search
+ * - Images: Image service to manipulate image
+ * 
+ * Website: ${pkg.homepage}
+ * ==
+ * Pkg: ${pkg.pkgName}@${pkg.version}
+ * Description: ${pkg.description}
+ * Doc: ${pkg.documentationURL}
+ * ==
+ */
 `;
 
-// export default {
-//   input: './src/index.js',
-//   output: {
-//     file: './dist/singlebase.esm.js',
-//     format: 'esm',
-//   },
-//   plugins: [terser.terser(), banner(topBanner)],
-// };
-
-
 const input = ["src/index.ts"];
+
 export  default [
   {
     // UMD
@@ -42,13 +52,22 @@ export  default [
       typescript(),
       nodeResolve(),
       babel({ babelHelpers: "bundled" }),
-      terser(),
-      banner(topBanner)
+      terser({
+        format: {
+          preamble: banner
+        }
+      }),
+      replace({
+        preventAssignment: true,
+        values: {
+          '__VERSION__': pkg.version
+        }
+      })
     ],
     output: {
       dir: "./dist/umd",
       format: "umd",
-      name: "myLibrary", // this is the name of the global object
+      name: "SinglebaseClient", // this is the name of the global object
       esModule: false,
       exports: "named",
       sourcemap: true,
@@ -60,8 +79,18 @@ export  default [
     plugins: [
       typescript(), 
       nodeResolve(), 
-      terser(), 
-      banner(topBanner)],
+      terser({
+        format: {
+          preamble: banner
+        }
+      }),
+      replace({
+        preventAssignment: true,
+        values: {
+          '__VERSION__': pkg.version
+        }
+      })
+    ],
     output: [
       {
         dir: "./dist/esm",
