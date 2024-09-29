@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Document</title>
+  <title>Singlebase-js Playground</title>
 </head>
 <body>
   
@@ -20,158 +20,193 @@
  </div>
   
 <script type="module">
-  //import createClient from './dist/esm/index.js'
-  import createClient  from 'https://cdn.jsdelivr.net/npm/@singlebase/singlebase-js/+esm'
 
-  //const API_URL = "http://127.0.0.1:5000/api"
-  const API_URL = "https://cloud.singlebaseapis.com/api"
+  import createClient from './dist/esm/index.js'
+  //import createClient  from 'https://cdn.jsdelivr.net/npm/@singlebase/singlebase-js/+esm'
 
-  const API_KEY = "ni5ibc3ldse4dku9.1XwfzW8Qm1BPIfmCDFJ9DMnwRcVVWDaUiatzqmIi1xGNX01Bv0ksSSpDCCHyB09j9-71VcSlUNp2cKKj"
+  const API_URL = "http://127.0.0.1:5000/api"
+  // const API_URL = "https://cloud.singlebaseapis.com/api"
+
+  const API_KEY = "ni5ibc3ldse4dku9.yF0hnKQDPb54lnn_dDD_6Z1uyd6HsxPVRNxdOm97KtUvq3E68PO2T120CtNntw2Pmd1dQuUfZEJCSip2"
 
   const AUTH_STORAGE_KEY = "sbc_pg_auth"
 
   const _EMAIL = ""
   const _PW = ""
 
-
-  const SBC_CONFIG = {
+  const singlebaseConfig = {
     api_url: API_URL,
     api_key: API_KEY,
     options: {
       headers: {
-          "Authorization": async () => await getAuthBearer(singlebase)
+          //"Authorization": async () => await getAuthBearer(singlebase)
       }
     }
   }
+  const client = createClient(singlebaseConfig)
 
-  const singlebase = createClient(SBC_CONFIG)
+ /**
+  * 
+  */
+  async function testDatastore() {
+    console.log("--- TESTING DATASTORE ---")
+
+    const collectionName = "waitlist"
+    const datastore = client.useDatastore()
+    console.log("useDatastore", "ok")
+    let res, _key, countBefore, countAfter = null
+
+    // list
+    console.log("... start #list")
+    res = await datastore.list(collectionName)
+    console.log("#list", res.ok, res.data.length)
+
+    //-- count 
+    console.log("... start #count")
+    res = await datastore.count(collectionName)
+    console.log("#count", res.ok, res?.data?.count)
+
+    //-- set
+    console.log("... start #set-insert")
+    const email0 = "newjack@city.com"
+    const email1 = "oldjack@city.com"
+    const email3 = "updatejack@city.com"
+    const emailx = `e-${Date.now()}@city.com`
+    res = await datastore.set(collectionName, {"email": email0})
+    _key = res?.ok ? res?.data[0]?._key : null
+    console.log("#set (insert)", res.ok, _key, res?.data[0]?.email, res?.data[0]?.email === email0)
+    console.log("... start #set-update")
+    res = await datastore.set(collectionName, _key, {"email": email1})
+    _key = res?.ok ? res?.data[0]?._key : null
+    console.log("#set (update)", res.ok, _key, res?.data[0]?.email, res?.data[0]?.email === email1)
+
+    //-- get 
+    console.log("... start #get")
+    res = await datastore.get(collectionName, _key)
+    console.log("#get", res.ok, _key, res?.data?.email, res?.data?.email === email1)
+
+    //-- delete 
+    console.log("... start #delete")
+    res = await datastore.count(collectionName)
+    countBefore = res?.data?.count 
+    res = await datastore.delete(collectionName, _key)
+    console.log("#delete (1)", res.ok, res)
+    res = await datastore.count(collectionName)
+    countAfter = res?.data?.count 
+    const xget = await datastore.get(collectionName, _key)
+    console.log("#delete (2)", countBefore, countAfter, countAfter<countBefore, xget?.ok)
+
+    //-- update
+    console.log("... start #update")
+    res = await datastore.update(collectionName, {
+      filters: { email: email1 },
+      data: { email: email3 }
+    })
+    console.log("#update", res.ok, res, res?.data?.length > 1, res?.data?.[0]?.email === email3)
+
+    //-- upsert
+    console.log("... start #upsert (update)")
+    res = await datastore.count(collectionName)
+    countBefore = res?.data?.count 
+    const res_upsert = await datastore.upsert(collectionName, {
+      filters: { email: email3 },
+      insertData: {"location": "Atlanta", email: email3},
+      updateData: {"location": "Charlotte"}
+    })
+    res = await datastore.count(collectionName)
+    countAfter= res?.data?.count 
+    console.log("#upsert (update)", res_upsert?.ok, countBefore, countAfter, countAfter === countBefore)
+
+    res = await datastore.count(collectionName)
+    countBefore = res?.data?.count 
+    const res_upsert2 = await datastore.upsert(collectionName, {
+      filters: { email: emailx },
+      insertData: {"location": "Atlanta", email: emailx},
+      updateData: {"location": "Charlotte"}
+    })
+    res = await datastore.count(collectionName)
+    countAfter= res?.data?.count 
+    console.log("#upsert (insert)", res_upsert2?.ok, countBefore, countAfter, countAfter > countBefore)
+
+    // list
+    console.log("... start #query")
+    res = await datastore.query(`SELECT FROM ${collectionName} WHERE $where`, {
+      variables: {
+        where: {
+          email: emailx
+        }
+      }
+    })
+    console.log("#query", res.ok, res?.data?.length)
 
 
-  /**
-   * 
-   * @params data:object
-   */
-  function setAuthSessionToken(data) {
-    const current_time = Date.now() 
-    const token_info = data?.token_info 
-    const expires_at = current_time + (parseInt(token_info?.ttl * 1000))
-    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({...data, expires_at}));
+    //-- archive 
+    console.log("... start #archive")
+    res = await datastore.count(collectionName)
+    countBefore = res?.data?.count 
+    const resx1 = await datastore.archive(collectionName, {filters: { email: emailx }})
+    res = await datastore.count(collectionName)
+    const archKey = resx1?.data?._ref
+    countAfter= res?.data?.count 
+    console.log("#archive", resx1?.ok, countBefore, countAfter, countAfter < countBefore, resx1?.data?._ref)
+
+    //!TODO - #recover: not implemented on the server yet
+    // console.log("... start #restore")
+    // res = await datastore.count(collectionName)
+    // countBefore = res?.data?.count 
+    // const resx2 = await datastore.restore(archKey)
+    // res = await datastore.count(collectionName)
+    // countAfter= res?.data?.count 
+    // console.log("#restore", resx2?.ok, countBefore, countAfter, countAfter > countBefore)
+
+    //TODO 
+    // - search
+    // - restore
+
   }
 
-  /**
-   * 
-   */
-  function getAuthSessionToken() {
-    const data = localStorage.getItem(AUTH_STORAGE_KEY);
-    return JSON.parse(data)
-  }
+  async function testFilestore() {
+    // to run this function, upload a file first
+    const filestore = client.useFilestore()
+    const uploadForm = document.querySelector('.upload')
 
-  async function refreshSessionToken(sbc, refresh_token, id_token) {
-    const creds = {
-      refresh_token,
-      id_token,
-      grant_type: 'refresh_token',
-    }
-    const res = await sbc.auth.signIn(creds)
-    if (res.ok) {
-      setAuthSessionToken(res?.data)
-    }
-  }
+    uploadForm.addEventListener('submit', async function(e) {
+        let res; 
 
-  async function getAuthBearer(sbc) {
-    
-    const token = getAuthSessionToken()
-    /**
-     * @object {aud, iat, exp, project_id, ttl}
-     */
-    const token_info = token?.token_info
-    /**
-     * @str
-     */
-    const refresh_token = token?.refresh_token
-    /**
-     * @str
-     */ 
-    const id_token = token?.id_token
+        e.preventDefault()
+        let file = e.target.uploadFile.files[0]
+        res = await filestore.upload(file)
+        if (res.ok) {
+          console.log("FILE UPLOADED SUCCESS", res)
+        } else {
+          console.log("FILE UPDLOAD ERROR", res)
+        }
 
-    const expires_at = token?.expires_at
+        res = await filestore.get(res?.data?.url)
+        console.log("FILE INFO", res)
 
-    const lapse_time = 120 // time in seconds to live before update
-    const current_time = Date.now() 
-    
-    const diff_time = expires_at - current_time
-    const require_refresh = diff_time < lapse_time
+        const fileUrl = await filestore.getURL(res?.data?.url)
+        console.log("FILE URL", fileUrl)
 
-    // if (require_refresh) {
-    //   await refreshSessionToken(sbc, refresh_token, id_token)
-    //   return await getAuthBearer(sbc)
-    // }
-    return `Bearer ${id_token}`    
-  }
+        const f0 = await filestore.makePublic(res?.data?.url, true)
+        res = await filestore.get(res?.data?.url)
+        console.log("FILE MAKE PUBLIC TRUE", f0, res)
+
+        const f1 = await filestore.makePublic(res?.data?.url, false)
+        res = await filestore.get(res?.data?.url)
+        console.log("FILE MAKE PUBLIC FALSE", f1, res)
+
+        const f2 = await filestore.setMetadata(res?.data?.url, {description: "This is awesome", location: "St Louis du Nord"})
+        res = await filestore.get(res?.data?.url)
+        console.log("FILE MAKE PUBLIC FALSE", f2, res)
 
 
-  async function loginUser(sbc) {
-
-    const creds = {
-      email: _EMAIL,
-      password: _PW,
-      grant_type: 'password',
-      aud: 'web'
-    }
-    const res = await sbc.auth.signIn(creds)
-    if (res.ok) {
-      setAuthSessionToken(res?.data)
-    }
-  }
-
-  async function addTodo(sbc) {
-      const { data, error, ok } = await sbc.collection('todos').insert({
-      task: "Do this....",
-      isDone: true
     })
   }
 
-  async function fetchTodos(sbc) {
-    const { data, error, ok } = await sbc.collection('todos').fetch()
-  }
+  //await testDatastore()
+  await testFilestore()
 
-  // const collectionName = "waitlist"
-
-  // const { data, error, ok } = await singlebase
-  //   .collection(collectionName)
-  //   .matches({"**": true})
-  //   .fetch()
-
-  console.log("LOGIN...")
-  //await loginUser(singlebase)
-
-  // await addTodo(singlebase)
-  await fetchTodos(singlebase)
-
-  //console.log("ALL", data)
-
-  // const d1 = await singlebase
-  //   .collection(collectionName)
-  //   .setDoc("2af886843f234301b6eaf6114b119612", {"count:$incr": 1})
-  // console.log("D1", d1)
-
-  // const d2 = await singlebase
-  //   .collection(collectionName)
-  //   .getDoc("2af886843f234301b6eaf6114b119612")
-  
-  // console.log("D2", d2)
-
-const uploadForm = document.querySelector('.upload')
-uploadForm.addEventListener('submit', async function(e) {
-    e.preventDefault()
-    let file = e.target.uploadFile.files[0]
-    const {data, error} = await singlebase.file.upload(file)
-    if (data) {
-      console.log("FILE UPLOADED", data)
-    } else {
-      console.log("FILE UPDLOAD ERROR", error)
-    }
-})
 
 </script>
 

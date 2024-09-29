@@ -41,9 +41,7 @@ export  default [
     plugins: [
       typescript(),
       nodeResolve(),
-      babel({
-        babelHelpers: "bundled",
-      }),
+      babel({ babelHelpers: "bundled" }),
       terser(),
       banner(topBanner)
     ],
@@ -59,7 +57,11 @@ export  default [
   // ESM and CJS
   {
     input,
-    plugins: [typescript(), nodeResolve(), terser(), banner(topBanner)],
+    plugins: [
+      typescript(), 
+      nodeResolve(), 
+      terser(), 
+      banner(topBanner)],
     output: [
       {
         dir: "./dist/esm",

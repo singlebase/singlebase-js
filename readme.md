@@ -52,40 +52,96 @@ yarn add @singlebase/singlebase-js
 
 ```js
 
-// import the package
+// 1. import the package
 import createClient from '@singlebase/singlebase-js'
 
-/**
+/** 
+ * 2. create the client config
+ * 
  * CreateClientConfigType:
  *    api_url:str     // the api url 
  *    api_key:str     // your api key
  *    config?:object  // extra config
  */
-const SBC_CONFIG = {
+const createClientConfig = {
   api_url: "https://xxx-xxx.singlebasecloud.com/api",
   api_key: "[[API-KEY]]"
 }
 
-// create a new client with API_URL and API_KEY
-const singlebase = createClient(SBC_CONFIG)
+/**
+ * 3. create the client
+ */
+const singlebase = createClient(createClientConfig)
 
-// get 5 items from the articles collection
-const { data, error, ok } = await singlebase
-    .collection('articles')
-    .fetch({limit: 5})
 
-if (ok) {
-  for (const article of data) {
-    console.log(article?.title)
+/**
+ * 4. use the services
+ */
+
+- singlebase.useDatastore()
+- singlebase.useAuth()
+- singlebase.useFilestore()
+- singlebase.LLM()
+
+
+// 4.1
+
+//-- Datastore
+const datastore = singlebase.useDatastore()
+
+// methods
+- datastore.list
+- datastore.set
+- datastore.get
+- datastore.update
+- datastore.delete
+- datastore.upsert
+- datastore.query
+- datastore.search 
+- datastore.count
+
+// example
+const articles = await datastore.list('articles')
+if (articles.ok) {
+  for (const article in articles?.data) {
+    console.log(article._key, article.title)
   }
-} else {
-  console.error('Something wrong!')
 }
+
+---
+
+// -- Filestore
+const filestore = singlebase.useFilestore()
+
+// methods
+- filestore.upload
+- filestore.get
+- filestore.getURL
+- filestore.makePublic
+- filestore.setMetadata
+- filestore.delete
+
+// example
+// html: <input id="myInputFile" type="file" name="uploadFile" required />
+let fileInput = document.querySelector("#myInputFile").files[0]
+const res = await filestore.upload(fileInput)
+if (res.ok) {
+  console.log('File URL', res?.data.url)
+}
+
+// -- Authentication
+
+const auth = singlebase.useAuth()
+
+// -- LLM
+
+const llm = singlebase.useLLM()
+
 
 ```
 
 
-## Quick Reference
+## Full SDK Reference
 
-Refer to the doc site for more details please visit https://docs.singlebasecloud.com/sdk/javascript 
+Refer to the doc site for more details, please visit https://docs.singlebasecloud.com/sdk/javascript 
 
