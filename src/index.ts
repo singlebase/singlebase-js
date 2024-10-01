@@ -306,7 +306,7 @@ const createClient = ({
           };
 
           // Load the JS
-          if (authUILib === true || (!isEmpty(authUILib))) {
+          if (authUILib === true || (isPlainObject(authUILib) && !isEmpty(authUILib))) {
               const _libVersion = authUILib?.version ?? 'latest';
               const _libModule =  authUILib?.module !== false;
               const _url = authUILib?.url ?? DEFAULT_AUTHUI_JS_PATH.replace("[[VERSION]]", `@${_libVersion}`);
