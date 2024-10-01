@@ -156,6 +156,60 @@ const llm = singlebase.useLLM()
 
 ```
 
+---
+
+
+## Singlebase-AuthUI
+
+`singlebase-js` also integrates with the **Singlebase-AuthUI** which is a universal component to authenticate users. 
+
+Use the method **initAuthUI** to initiliaze the AuthUI. 
+
+`#client.initAuthUI(authUIConfig:{}, authUILib:<bool=false, object>)`
+
+Having `authUILib=true`, it will load 
+
+or as Object
+
+```
+const authUILib = {
+  url?:str - By default it will load it jsdelivr. Set a different path here
+  version?:str - When url is not set, you can load a different version
+  module: bool - by default it will set the script type as 'module'
+}
+```
+
+Example loading:
+
+```
+singlebase.initAuthUI({
+  signinCallback(user => {
+    if (user?._key) {
+      // ... user is logged in
+    }
+  })
+}, true)
+```
+
+Or pick a different version of the lib 
+
+```
+singlebase.initAuthUI({
+  signinCallback(user => {
+    if (user?._key) {
+      // ... user is logged in
+    }
+  })
+}, {version: "1.2.3"})
+
+```
+
+Inside of your HTML, add the tag below. And voila, done! 
+
+```
+<singlebase-authui></singlebase-authui>
+```
+
 
 ## Full SDK Reference
 
