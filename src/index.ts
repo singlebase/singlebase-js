@@ -37,9 +37,10 @@ import {
   SinglebaseOptions
 } from './types';
 import httpx from './httpx';
-import { isPlainObject, isFn } from './lib';
+import { isPlainObject, isFn, isEmpty } from './lib';
 
 const DEFAULT_API_URL = 'https://cloud.singlebaseapis.com/api';
+const DEFAULT_AUTHUI_JS_PATH = "https://cdn.jsdelivr.net/npm/@singlebase/singlebase-authui[[VERSION]]/dist/index.js"
 const SBCUI_SYMBOL_KEY = 'singlebaseui';
 
 
@@ -58,6 +59,16 @@ interface SinglebaseClient {
   useLLM: () => ReturnType<typeof LLM>;
   initAuthUI: (authUIConfig?: Record<string, any>) => void;
 }
+
+type JsLibOptions = {
+  url?: string;
+  module?: boolean;
+  version?: string;
+};
+
+type AuthUILibType = boolean | JsLibOptions;
+
+type AuthUIConfigType = Record<string, any>;
 
 /**
  * Makes an AJAX request.
@@ -140,6 +151,45 @@ const createDispatcher = (
     return makeRequest(url, payload, combinedOptions);
   };
 };
+
+/**
+ * Load a script
+ * @param url 
+ * @param options 
+ * @returns 
+ */
+function loadScript(url: string, options?: { module?: boolean; async?: boolean; defer?: boolean }): void {
+  
+  // Check if the script is already loaded
+  if (document.querySelector(`script[src="${url}"]`)) {
+      console.log(`Script ${url} is already loaded.`);
+      return; // Exit if the script is already present
+  }
+
+  // Set default options
+  const defaultOptions = { module: true, defer: true, async: false };
+
+  const _options = { ...defaultOptions, ...options };
+
+  // Ensure only one of async or defer is true
+  if (_options.async && _options.defer) {
+      console.warn('Both async and defer cannot be true. Defaulting to defer.');
+      _options.async = false; // Default to defer if both are true
+  }
+  const script = document.createElement('script');
+  script.src = url;
+  if (_options.module) {
+      script.type = 'module';
+  }
+  if (_options.async) {
+      script.async = true;
+  }
+  if (_options.defer) {
+      script.defer = true; 
+  }
+  // Append the script to the document head or body
+  document.head.appendChild(script);
+}
 
 /**
  * Initializes the Singlebase client.
@@ -238,19 +288,33 @@ const createClient = ({
     return clients.auth;
   };
 
-  /**
-   * Initializes the Authentication UI and stores it in the window using a Symbol key.
-   * @param authUIConfig - Configuration for the authentication UI.
-   */
-  const initAuthUI = (authUIConfig: Record<string, any> = {}) => {
-    const authUISymbol = Symbol.for(SBCUI_SYMBOL_KEY);
-    if (!(window as any)[authUISymbol]) {
-      (window as any)[authUISymbol] = {
-        auth: getAuth(),
-        authUIConfig,
-      };
-    }
-  };
+
+    /**
+     * Initializes the Authentication UI and stores it in the window using a Symbol key.
+     * Also load the AuthUI library that contains the
+     * @param authUIConfig - Configuration for the authentication UI.
+     * @param authUILib - To load the AuthUI library, to use the tag. By default it's false.
+     */
+    const initAuthUI = (authUIConfig: AuthUIConfigType = {}, authUILib: AuthUILibType = false) => {
+      const authUISymbol = Symbol.for(SBCUI_SYMBOL_KEY);
+      if (!(window as any)[authUISymbol]) {
+
+          // add config un the symbol
+          (window as any)[authUISymbol] = {
+            auth: getAuth(),
+            authUIConfig,
+          };
+
+          // Load the JS
+          if (authUILib === true || (!isEmpty(authUILib))) {
+              const _libVersion = authUILib?.version ?? 'latest';
+              const _libModule =  authUILib?.module !== false;
+              const _url = authUILib?.url ?? DEFAULT_AUTHUI_JS_PATH.replace("[[VERSION]]", `@${_libVersion}`);
+              loadScript(_url, { module: _libModule });
+          }
+      }
+    };
+
 
   return {
     /**
