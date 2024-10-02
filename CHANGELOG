@@ -1,6 +1,9 @@
-0.1.x
+
+0.2.x
 - Updated API
 - Fixed Headers[Authorization]
+- added useFilestore in the initAuthUI to help upload image 
+- added functionalities in initAuthUI to automatically import the AuthUILib for convenience
 
 
 0.0.1

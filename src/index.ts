@@ -276,6 +276,13 @@ const createClient = ({
   // Initialize dispatch
   const dispatch = createDispatcher(api_url, dispatchOptions);
 
+  const useFilestore = (): ReturnType<typeof Filestore> => {
+    if (!clients.filestore) {
+      clients.filestore = new Filestore(dispatch);
+    }
+    return clients.filestore;
+  }
+
   /**
    * Lazily initializes and retrieves the Auth client.
    *
@@ -302,6 +309,7 @@ const createClient = ({
           // add config un the symbol
           (window as any)[authUISymbol] = {
             auth: getAuth(),
+            useFilestore,
             authUIConfig,
           };
 
@@ -349,12 +357,7 @@ const createClient = ({
      *
      * @returns The file storage client.
      */
-    useFilestore: (): ReturnType<typeof Filestore> => {
-      if (!clients.filestore) {
-        clients.filestore = new Filestore(dispatch);
-      }
-      return clients.filestore;
-    },
+    useFilestore,
 
     /**
      * Access datastore functionalities.
