@@ -192,7 +192,7 @@ export default class Datastore {
       return this._createError("Datastore.get: Record key must be a string.");
     }
 
-    const res = await this._performAction('db.fetch', collectionName, { recordKey, return_fields:returnFields });
+    const res = await this._performAction('db.fetch', collectionName, { _key: recordKey, return_fields:returnFields });
 
     // fetch always return an array, we will extract the first value, and put it in data
     if (res.ok) {
