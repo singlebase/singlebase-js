@@ -128,7 +128,7 @@ export default class Datastore {
    * @param collectionName The name of the collection.
    * @param keyOrDataRecord  a _key string or an object containing at least the _key.
    * @param dataRecord  an object containing the data when keyOrDataRecord exists
-   * @returns ResultType indicating the operation's success or failure.
+   * @returns ResultType indicating the operation's success or failure, of only one data:{}
    * 
    * Example
    * 
@@ -149,10 +149,10 @@ export default class Datastore {
       if(!isPlainObject(dataRecord)) {
         return this._createError("Datatsore.set(collectionName:str, _key:str, data:{}): #data must be a plain object");
       }
-      if (dataRecord?._key) {
+      if (dataRecord?._key && dataRecord?._key !== keyOrDataRecord) {
         return this._createError("Datatsore.set: _key conflict. Ensure sure data._key doesn't exists ");
       }
-      data = {_key: keyOrDataRecord, ...dataRecord } 
+      data = {...dataRecord, _key: keyOrDataRecord } 
     } else {
       data = keyOrDataRecord
     }
@@ -161,6 +161,7 @@ export default class Datastore {
       return this._createError("Datastore.set: Data must be a plain object.");
     }
 
+    let res;
     if (data._key) {
       if (!isString(data._key)) {
         return this._createError("Datastore.set: The `_key` must be a string.");
@@ -170,11 +171,14 @@ export default class Datastore {
         filters: { _key: data._key },
         data: data
       };
-      return await this._performAction('db.update', collectionName, updateCriteria);
+      res = await this._performAction('db.update', collectionName, updateCriteria);
     } else {
       // If _key does not exist, perform an insert
-      return await this._performAction('db.insert', collectionName, { data });
+      res = await this._performAction('db.insert', collectionName, { data });
     }
+
+    return this._extractFirstOnly(res)
+
   }
 
   /**
@@ -182,7 +186,7 @@ export default class Datastore {
    * @param collectionName The name of the collection.
    * @param recordKey The unique key of the document.
    * @param returnFields - Array of fields to return.
-   * @returns ResultType containing the retrieved document or an error.
+   * @returns ResultType containing the retrieved document or an error.  return data:{}
    */
   public async get(collectionName: string, recordKey: string, returnFields=[]): Promise<ResultType> {
     if (!isString(collectionName)) {
@@ -192,14 +196,22 @@ export default class Datastore {
       return this._createError("Datastore.get: Record key must be a string.");
     }
 
-    const res = await this._performAction('db.fetch', collectionName, { _key: recordKey, return_fields:returnFields });
+    const res = await this._performAction('db.fetch', collectionName, { filters: { _key: recordKey} ,return_fields:returnFields });
+    return this._extractFirstOnly(res)
 
-    // fetch always return an array, we will extract the first value, and put it in data
-    if (res.ok) {
-      const _data = res.data?.[0]
-      res.data = _data
+  }
+
+
+  /**
+   * fetch|insert|update always return an array, we will extract the first value, and put it in data
+   * @param res 
+   * @returns ResultType
+   */
+  private _extractFirstOnly(res:ResultType): ResultType {
+    if (res.ok && Array.isArray(res?.data) && res?.data?.length) {
+      res.data = res.data?.[0]
     }
-    return res 
+    return res
   }
 
   /**

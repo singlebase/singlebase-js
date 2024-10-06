@@ -485,7 +485,7 @@ class AuthClient {
 
       if (refresh && token.refresh_token) {
         if (await this._refreshToken(token.refresh_token, token.id_token)) {
-          return this.getIdToken(false);
+          return await this.getIdToken(false);
         }
       }
     }
