@@ -46,6 +46,8 @@ class AuthClient {
   private readonly _storage: ReturnType<typeof useStorage>;
   /** Reactive state holding authentication data */
   private readonly _state: AuthStateType;
+  private _user_profile: object | null;
+  private _token: String | null;
   /** Application settings fetched from the server */
   public settings: object | null;
   /** Timer identifier for the token auto-refresh mechanism */
@@ -54,13 +56,9 @@ class AuthClient {
   private readonly _autoRefreshToken: boolean;
   /** Flag indicating whether it's initialized */
   private _initialized: boolean;
-  /** Flag indicating whether a refresh is in progress */
-  private _refreshInProgress: boolean;
   /** Flag indicating whether the token refresh has failed */
   private _refreshFailed: boolean;
-  /** Number of retry attempts */
-  private _retryCount: number;
-  
+  /* Hold the resfreshed queue data */
   private _refreshQueue: Promise<boolean> | null = null;
 
   
@@ -79,9 +77,11 @@ class AuthClient {
     this._autoRefreshTicker = null;
     this._initialized = false;
 
-    this._refreshInProgress = false;
     this._refreshFailed = false;
     this._retryCount = 0;
+
+    this._user_profile = null 
+    this._token = null 
 
     this._state = useReactiveState({
       user_profile: null,
@@ -116,7 +116,7 @@ class AuthClient {
    * @returns The user key or null if not available.
    */
   public get userKey(): string | null {
-    return this._state?.user_profile?.user_key || null;
+    return this._user_profile?.user_key || null;
   }
 
   /** 
@@ -125,7 +125,7 @@ class AuthClient {
    * @returns The user profile object or null if not available.
    */
   public get userProfile(): UserInterface | null {
-    return copy(this._state?.user_profile);
+    return copy(this._user_profile);
   }
 
   /** 
@@ -143,7 +143,7 @@ class AuthClient {
    * @returns The user's email or undefined if not available.
    */
   public get email(): string | undefined {
-    return this._state?.user_profile?.email;
+    return this._user_profile?.email;
   }
 
   /** 
@@ -152,7 +152,7 @@ class AuthClient {
    * @returns True if authenticated, false otherwise.
    */
   public get isAuthenticated(): boolean {
-    return !!(this._state?.token?.id_token && this._isTokenValid(this._state.token));
+    return !!(this._token?.id_token && this._isTokenValid(this._token));
   }
 
   /** 
@@ -161,7 +161,7 @@ class AuthClient {
    * @returns The ID token string or null if not authenticated.
    */
   public get idToken(): string | null {
-    return this.isAuthenticated ? this._state?.token?.id_token || null : null;
+    return this.isAuthenticated ? this._token?.id_token || null : null;
   }
 
   /**
@@ -447,7 +447,7 @@ class AuthClient {
    */
   public async getUser(): Promise<UserInterface | null> {
     if (await this.getIdToken()) {
-      return this._state?.user_profile || null;
+      return this._user_profile || null;
     }
     return null;
   }
@@ -515,15 +515,16 @@ class AuthClient {
    */
   public async loadSettings(): Promise<AuthResultInterface> {
     try {
-      const resp = await this._dispatch({ action: 'auth.settings' });
-
-      if (resp.ok) {
-        this.settings = resp.data;
-        return AuthResultOk(resp.data);
+      if (!this.settings) {
+        const resp = await this._dispatch({ action: 'auth.settings' });
+        if (resp.ok) {
+          this.settings = resp.data;
+          return AuthResultOk(resp.data);
+        } else {
+          this.settings = null;
+          return AuthResultErr(resp.error);
+        }
       }
-
-      this.settings = null;
-      return AuthResultErr(resp.error);
     } catch (error) {
       this.settings = null;
       return AuthResultErr(error);
@@ -548,7 +549,7 @@ class AuthClient {
    */
   public onAuthStateChanged(callback: (userProfile: UserInterface | null) => void) {
     // Invoke the callback immediately with the current state
-    callback(copy(this._state?.user_profile));
+    callback(copy(this._user_profile));
 
     return this.onStateChanged((changes, prev) => {
       if (changes?.token?.id_token !== prev?.token?.id_token) {
@@ -660,7 +661,6 @@ class AuthClient {
       if (resp?.ok) {
         this._setAuthData(resp.data);
         this._refreshFailed = false;
-        this._retryCount = 0;
         return true;
       } else {
         this._refreshFailed = true;
@@ -705,6 +705,8 @@ class AuthClient {
    */
   private _clearState(): void {
     this._stopAutoRefreshToken();
+    this._user_profile = null 
+    this._token = null 
     this._state.__patch__ = {
       user_profile: null,
       token: null,
@@ -717,9 +719,14 @@ class AuthClient {
    * @param respData - The response data containing authentication tokens and user profile.
    */
   private _setState(respData: object): void {
+    const user_profile = (respData as any)?.user_profile || null
+    const token = respData
+    this._user_profile = user_profile 
+    this._token = token
+
     this._state.__patch__ = {
-      user_profile: (respData as any)?.user_profile || null,
-      token: respData || null,
+      user_profile: user_profile,
+      token: token,
     };
   }
 
