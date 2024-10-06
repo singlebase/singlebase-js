@@ -124,11 +124,11 @@ export default class Datastore {
   }
 
   /**
-   * Sets a document in the datastore.
+   * Sets document 1 document by _key. (update/insert)
    * @param collectionName The name of the collection.
    * @param keyOrDataRecord  a _key string or an object containing at least the _key.
    * @param dataRecord  an object containing the data when keyOrDataRecord exists
-   * @returns ResultType indicating the operation's success or failure, of only one data:{}
+   * @returns ResultType indicating the operation's success or failure, return 1 document of only one data:{}
    * 
    * Example
    * 
@@ -182,11 +182,11 @@ export default class Datastore {
   }
 
   /**
-   * Retrieves a document by its _key.
+   * Retrieves one document by its _key.
    * @param collectionName The name of the collection.
    * @param recordKey The unique key of the document.
    * @param returnFields - Array of fields to return.
-   * @returns ResultType containing the retrieved document or an error.  return data:{}
+   * @returns ResultType containing the 1 retrieved document or an error.  return data:{}
    */
   public async get(collectionName: string, recordKey: string, returnFields=[]): Promise<ResultType> {
     if (!isString(collectionName)) {
@@ -269,6 +269,34 @@ export default class Datastore {
       return this._createError("Datastore.list: Criteria must be a DSQueryCriteriaType object with `filters`.");
     }
     return await this._performAction('db.fetch', collectionName, _criteria);
+  }
+
+  /**
+   * insert one or multiple documents based on DSMutationCriteriaType.
+   * @param collectionName The name of the collection.
+   * @param data DSMutationCriteriaType object.
+   * @returns ResultType indicating the operation's success or failure.
+   */
+  public async insert(collectionName: string, data:[]): Promise<ResultType> {
+    if (!isString(collectionName)) {
+      return this._createError("Datastore.update: Collection name must be a string.");
+    }
+
+    if (!isPlainObject(data) || !Array.isArray(data)) {
+      return this._createError("Datastore.update: data must be an Object or Array[Object].");
+    }
+    const _data = Array.isArray(data) ? data : [data]
+
+    // Validate data - it will check to see if every element has _key
+    for (const item of _data) {
+      if (!isPlainObject(item)) {
+        return this._createError("Datastore.insert: Data must be of Object type");
+      }
+      if(item?._key) {
+        return this._createError("Datastore.insert: Data must not contain '_key'");
+      }
+    }
+    return await this._performAction('db.insert', collectionName, {data: _data});
   }
 
   /**

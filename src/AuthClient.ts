@@ -60,7 +60,10 @@ class AuthClient {
   private _refreshFailed: boolean;
   /** Number of retry attempts */
   private _retryCount: number;
+  
+  private _refreshQueue: Promise<boolean> | null = null;
 
+  
   /**
    * Initializes a new instance of AuthClient.
    *
@@ -628,42 +631,46 @@ class AuthClient {
    * @param id_token - The current ID token.
    * @returns A promise resolving to a boolean indicating whether the refresh was successful.
    */
+
   private async _refreshToken(refresh_token: string, id_token: string): Promise<boolean> {
     if (!refresh_token || !id_token) return false;
-
-    if (this._refreshInProgress) {
-      // Return early if a refresh is already in progress
-      return false;
+  
+    if (!this._refreshQueue) {
+      this._refreshQueue = this._executeRefresh(refresh_token, id_token);
     }
-
-    this._refreshInProgress = true;
-
+  
+    try {
+      return await this._refreshQueue;
+    } finally {
+      this._refreshQueue = null;
+    }
+  }
+  
+  /**
+   * Implement a queue system for refresh attempts:
+   */
+  private async _executeRefresh(refresh_token: string, id_token: string): Promise<boolean> {
     try {
       const resp = await this._dispatch({
         action: 'auth.refresh_token',
         refresh_token,
         id_token,
       });
-
+  
       if (resp?.ok) {
         this._setAuthData(resp.data);
-        this._refreshFailed = false; // Reset refresh failed flag on success
-        this._retryCount = 0; // Reset retry count on success
+        this._refreshFailed = false;
+        this._retryCount = 0;
         return true;
       } else {
-        // Handle the case where the refresh fails
         this._refreshFailed = true;
         return false;
       }
     } catch {
-      // Handle network or other errors
       this._refreshFailed = true;
       return false;
-    } finally {
-      this._refreshInProgress = false;
     }
   }
-
   /**
    * Checks if the provided token is valid based on its expiry time.
    *
@@ -748,16 +755,27 @@ class AuthClient {
   /**
    * Starts the auto-refresh mechanism to periodically refresh the authentication token.
    */
+
   private async _startAutoRefreshToken(): Promise<void> {
     await this._stopAutoRefreshToken();
-    this._autoRefreshTicker = window.setInterval(() => {
-      if (!this._refreshFailed) {
-        this.getIdToken();
-      }
-    }, AUTO_REFRESH_TICK_DURATION);
-    // Removed immediate call to this.getIdToken();
+    this._scheduleNextRefresh();
   }
 
+  /**
+   * Implement a dynamic refresh schedule based on the token's expiration time
+   */
+  private _scheduleNextRefresh(): void {
+    const token = this._getToken();
+    if (token && token.token_info && token.token_info.exp) {
+      const expiresIn = (token.token_info.exp * 1000) - Date.now() - (EXPIRY_MARGIN * 1000);
+      const refreshIn = Math.max(0, expiresIn);
+  
+      clearTimeout(this._autoRefreshTicker);
+      this._autoRefreshTicker = window.setTimeout(() => {
+        this.getIdToken().then(() => this._scheduleNextRefresh());
+      }, refreshIn);
+    }
+  }  
   /**
    * Stops the auto-refresh mechanism.
    */
