@@ -58,6 +58,7 @@ interface SinglebaseClient {
   useDatastore: () => ReturnType<typeof Datastore>;
   useLLM: () => ReturnType<typeof LLM>;
   initAuthUI: (authUIConfig?: Record<string, any>) => void;
+  initAuthSession: (opt?: Record<string, any>) => void;
 }
 
 type JsLibOptions = {
@@ -226,7 +227,7 @@ const createClient = ({
     throw new Error('API key is required for Singlebase initialization.');
   }
 
-  // Hold a singleton
+  // Hold this instance
   const clients = {
     auth: null as ReturnType<typeof AuthClient> | null,
     filestore: null as ReturnType<typeof Filestore> | null,
@@ -282,6 +283,17 @@ const createClient = ({
     return clients.filestore;
   }
 
+  const initAuthSession = (opt:{}): ReturnType<typeof AuthClient> => {
+    const auth = getAuth()
+    try {
+      auth.initSession({...opt, session: true})
+      console.log("Singlebase: AuthSession initialized")
+    } catch {
+      console.error("Singlebase: AuthSession failed")
+    }
+    return auth
+  }
+
   /**
    * Lazily initializes and retrieves the Auth client.
    *
@@ -290,37 +302,50 @@ const createClient = ({
   const getAuth = (): ReturnType<typeof AuthClient> => {
     if (!clients.auth) {
       clients.auth = AuthClient(dispatch, authStorageKey);
+
+      // initialize the auth client, without the session
+      // explicitely use `client.initAuthSession` to keep sesion alive
+      setTimeout(async () => {
+        try {
+          await clients?.auth.initSession({session: false}); // do not init session here. 
+        } catch (error) {
+          console.error('Singlebase: AuthClient failed to initialize properly:', error);
+        }
+      }, 0);
     }
     return clients.auth;
   };
 
 
+  /**
+   * Initializes the Authentication UI and stores it in the window using a Symbol key.
+   * Also load the AuthUI library that contains the
+   * @param authUIConfig - Configuration for the authentication UI.
+   * @param authUILib - To load the AuthUI library, to use the tag. By default it's false.
+   */
+  const initAuthUI = (authUIConfig: AuthUIConfigType = {}, authUILib: AuthUILibType = false) => {
+    // symbol
+    const authUISymbol = Symbol.for(SBCUI_SYMBOL_KEY);
+    if (!(window as any)[authUISymbol]) {
+        // add config un the symbol
+        (window as any)[authUISymbol] = {
+          auth: initAuthSession({session: true}),
+          useFilestore,
+          authUIConfig,
+        };
+    }
+
     /**
-     * Initializes the Authentication UI and stores it in the window using a Symbol key.
-     * Also load the AuthUI library that contains the
-     * @param authUIConfig - Configuration for the authentication UI.
-     * @param authUILib - To load the AuthUI library, to use the tag. By default it's false.
+     * load the ui library: @singlebase/singlebase-authui
      */
-    const initAuthUI = (authUIConfig: AuthUIConfigType = {}, authUILib: AuthUILibType = false) => {
-      const authUISymbol = Symbol.for(SBCUI_SYMBOL_KEY);
-      if (!(window as any)[authUISymbol]) {
-
-          // add config un the symbol
-          (window as any)[authUISymbol] = {
-            auth: getAuth(),
-            useFilestore,
-            authUIConfig,
-          };
-
-          // Load the JS
-          if (authUILib === true || (isPlainObject(authUILib) && !isEmpty(authUILib))) {
-              const _libVersion = authUILib?.version ?? 'latest';
-              const _libModule =  authUILib?.module !== false;
-              const _url = authUILib?.url ?? DEFAULT_AUTHUI_JS_PATH.replace("[[VERSION]]", `@${_libVersion}`);
-              loadScript(_url, { module: _libModule });
-          }
-      }
-    };
+    if (authUILib === true || (isPlainObject(authUILib) && !isEmpty(authUILib))) {
+      console.log("Singlebase: loading AuthUI library...")
+      const _libVersion = authUILib?.version ?? 'latest';
+      const _libModule =  authUILib?.module !== false;
+      const _url = authUILib?.url ?? DEFAULT_AUTHUI_JS_PATH.replace("[[VERSION]]", `@${_libVersion}`);
+      loadScript(_url, { module: _libModule });
+    }
+  };
 
 
   return {
@@ -383,9 +408,15 @@ const createClient = ({
     },
 
     /**
-     * Initializes the authentication UI.
+     * init the Auth Session - to keep the session alive
      */
-    initAuthUI,
+    initAuthSession,
+
+    /**
+     * init the Auth UI + Session
+     */
+    initAuthUI
+
   };
 };
 

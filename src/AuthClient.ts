@@ -25,6 +25,8 @@ import {
 const STORAGE_TOKEN_KEY = 'token';
 /** Storage key for the nonce */
 const STORAGE_NONCE_KEY = 'nonce';
+/** Storage key for the nonce */
+const STORAGE_SETTINGS_KEY = 'settings';
 
 /** Interval duration (in milliseconds) to check and refresh the current session */
 const AUTO_REFRESH_TICK_DURATION = 60 * 1000; // Changed to 60 seconds
@@ -52,8 +54,8 @@ class AuthClient {
   public settings: object | null;
   /** Timer identifier for the token auto-refresh mechanism */
   private _autoRefreshTicker: number | null;
-  /** Flag indicating whether auto-refresh is enabled */
-  private readonly _autoRefreshToken: boolean;
+  /** Flag indicating whether session is active */
+  private _session_active: boolean;
   /** Flag indicating whether it's initialized */
   private _initialized: boolean;
   /** Flag indicating whether the token refresh has failed */
@@ -67,48 +69,45 @@ class AuthClient {
    *
    * @param dispatch - The dispatch function for handling authentication actions.
    * @param storage - The storage utility for persisting authentication data.
-   * @param autoRefreshToken - Flag to enable or disable automatic token refreshing.
    */
-  constructor(dispatch: DispatchType, storage: ReturnType<typeof useStorage>, autoRefreshToken = true) {
+  constructor(dispatch: DispatchType, storage: ReturnType<typeof useStorage>) {
     this._dispatch = dispatch;
     this._storage = storage;
-    this._autoRefreshToken = autoRefreshToken;
     this.settings = null;
     this._autoRefreshTicker = null;
     this._initialized = false;
-
+    this._session_active = false
     this._refreshFailed = false;
-    this._retryCount = 0;
-
+  
     this._user_profile = null 
     this._token = null 
 
-    this._state = useReactiveState({
-      user_profile: null,
-      token: null,
-    });
+    this._state = useReactiveState({ user_profile: null, token: null});
 
-    // Initialize authentication client
-    this.initialize();
   }
 
   /**
    * Initializes the authentication client by loading settings, adding storage event listeners,
    * loading cached authentication data, and starting the auto-refresh mechanism.
    */
-  public async initialize(): Promise<void> {
-    if (this._initialized) {
-      return;
+  public async initSession(opt={session: true}): Promise<void> {
+
+    // stuff to run once
+    if (!this._initialized) {
+      this._initialized = true;
+      this._addStorageEventListener();
     }
 
-    await this.loadSettings();
-    this._addStorageEventListener();
+    /** reload some data if necessary */
     await this._loadFromCache();
-    if (this._autoRefreshToken) {
+    await this.loadSettings();
+
+    if (opt?.session === true && !this._session_active) {
+      this._session_active = true
       this._startAutoRefreshToken();
     }
-    this._initialized = true;
   }
+
 
   /** 
    * Retrieves the user's unique key.
@@ -172,22 +171,7 @@ class AuthClient {
    * @returns A promise resolving to the authentication result.
    */
   public async updateAccount(data: UpdateAccountInterface): Promise<AuthResultInterface> {
-    try {
-      const resp = await this._dispatch({
-        action: 'auth.update_account',
-        ...data,
-      });
-
-      if (resp.ok) {
-        this._setAuthData(resp.data);
-        const userProfile = resp.data?.user_profile;
-        return AuthResultOk(userProfile);
-      }
-
-      return AuthResultErr(resp.error);
-    } catch (error) {
-      return AuthResultErr(error);
-    }
+    return this._authAction('auth.update_account', data);
   }
 
   /**
@@ -197,36 +181,15 @@ class AuthClient {
    * @returns A promise resolving to the authentication result.
    */
   public async updateProfile(data: UpdateProfileInterface): Promise<AuthResultInterface> {
-    try {
-      const idToken = await this.getIdToken();
-      if (!idToken) {
-        return AuthResultErr('Invalid or missing ID token.');
-      }
+    const idToken = await this.getIdToken();
+    const token = this._getToken()
+    if (!idToken || !token) return AuthResultErr('Invalid or Missing ID token.');
 
-      const token = this._getToken();
-      if (!token) {
-        return AuthResultErr('Missing token.');
-      }
+    const { aud, id_token, refresh_token } = token;
+    const _data = {aud, id_token, refresh_token, data}
 
-      const { aud, id_token, refresh_token } = token;
-      const resp = await this._dispatch({
-        action: 'auth.update_profile',
-        aud,
-        id_token,
-        refresh_token,
-        data,
-      });
+    return this._authAction('auth.update_profile', _data);
 
-      if (resp.ok) {
-        this._setAuthData(resp.data);
-        const userProfile = resp.data?.user_profile;
-        return AuthResultOk(userProfile);
-      }
-
-      return AuthResultErr(resp.error);
-    } catch (error) {
-      return AuthResultErr(error);
-    }
   }
 
   /**
@@ -236,20 +199,7 @@ class AuthClient {
    * @returns A promise resolving to the authentication result.
    */
   public async sendOTP(data: SendOTPInterface): Promise<AuthResultInterface> {
-    try {
-      const resp = await this._dispatch({
-        action: 'auth.send_otp',
-        ...data,
-      });
-
-      if (resp.ok) {
-        return AuthResultOk(true);
-      }
-
-      return AuthResultErr(resp.error);
-    } catch (error) {
-      return AuthResultErr(error);
-    }
+    return this._authAction('auth.send_otp', data);
   }
 
   /**
@@ -259,24 +209,7 @@ class AuthClient {
    * @returns A promise resolving to the authentication result.
    */
   public async signUpWithPassword(credentials: CredentialsInterface): Promise<AuthResultInterface> {
-    try {
-      this._clearState();
-      const resp = await this._dispatch({
-        ...credentials,
-        action: 'auth.signup',
-      });
-
-      if (resp.ok) {
-        return AuthResultOk(resp.data);
-      }
-
-      return AuthResultErr(resp.error);
-    } catch (error) {
-      return AuthResultErr(error);
-    } finally {
-      this._clearState();
-      this._purgeCache();
-    }
+    return this._authFlow('auth.signup', credentials);
   }
 
   /**
@@ -286,28 +219,7 @@ class AuthClient {
    * @returns A promise resolving to the authentication result.
    */
   public async signInWithPassword(credentials: CredentialsInterface): Promise<AuthResultInterface> {
-    try {
-      this._clearState();
-      const resp = await this._dispatch({
-        grant_type: 'password',
-        ...credentials,
-        action: 'auth.signin',
-      });
-
-      if (resp.ok) {
-        this._setAuthData(resp.data);
-        const userProfile = resp.data?.user_profile;
-        return AuthResultOk(userProfile);
-      }
-
-      this._clearState();
-      this._purgeCache();
-      return AuthResultErr(resp.error);
-    } catch (error) {
-      this._clearState();
-      this._purgeCache();
-      return AuthResultErr(error);
-    }
+    return this._authFlow('auth.signin', { grant_type: 'password', ...credentials });
   }
 
   /**
@@ -483,7 +395,7 @@ class AuthClient {
     const token = this._getToken();
     if (token) {
       if (this._isTokenValid(token)) {
-        return token.id_token || null;
+        return token.id_token;
       }
 
       if (refresh && token.refresh_token) {
@@ -513,22 +425,24 @@ class AuthClient {
    *
    * @returns A promise resolving to the authentication result containing the settings.
    */
-  public async loadSettings(): Promise<AuthResultInterface> {
+  public async loadSettings(): Promise<boolean> {
+    let settings = null
     try {
-      if (!this.settings) {
+      settings = this._storage.get(STORAGE_SETTINGS_KEY)
+      if (!settings) {
         const resp = await this._dispatch({ action: 'auth.settings' });
         if (resp.ok) {
-          this.settings = resp.data;
-          return AuthResultOk(resp.data);
+          settings = resp.data;
+          this._storage.set(STORAGE_SETTINGS_KEY, settings)
         } else {
-          this.settings = null;
-          return AuthResultErr(resp.error);
+          settings = null;
         }
       }
     } catch (error) {
       this.settings = null;
-      return AuthResultErr(error);
     }
+    this.settings = settings
+    return settings !== null
   }
 
   /**
@@ -542,20 +456,33 @@ class AuthClient {
   }
 
   /**
-   * Subscribes to authentication state changes, specifically token updates, and invokes the callback with the updated user profile.
+   * Subscribes to sessions state changes, specifically token updates, and invokes the callback with the updated user profile.
    *
    * @param callback - The function to call when the authentication state changes.
    * @returns A subscription object that can be used to unsubscribe.
    */
-  public onAuthStateChanged(callback: (userProfile: UserInterface | null) => void) {
+  public onSessionChanged(callback: (userProfile: UserInterface | null) => void) {
     // Invoke the callback immediately with the current state
-    callback(copy(this._user_profile));
-
+    setTimeout(() => {
+      callback(copy(this._user_profile));
+    })
+    
     return this.onStateChanged((changes, prev) => {
       if (changes?.token?.id_token !== prev?.token?.id_token) {
         callback(copy(changes?.user_profile));
       }
     });
+  }
+
+  /**
+   * @deprecated 
+   * @use onSessionChanged
+   * @param callback 
+   * @returns 
+   */
+  public onAuthStateChanged(callback: (userProfile: UserInterface | null) => void) {
+    console.warn("AuthClient Deprecation: @onAuthStateChanged - Use onSessionChanged")
+    return this.onSessionChanged(callback)
   }
 
   /**
@@ -565,6 +492,35 @@ class AuthClient {
    */
   public async refreshAuthState(): Promise<boolean> {
     return this._loadFromCache();
+  }
+
+  private async _authAction(action: string, data: object): Promise<AuthResultInterface> {
+    try {
+      const resp = await this._dispatch({ action, ...data });
+      if (resp.ok) {
+        this._setAuthData(resp.data);
+        return AuthResultOk(resp.data?.user_profile);
+      }
+      return AuthResultErr(resp.error);
+    } catch (error) {
+      return AuthResultErr(error);
+    }
+  }
+
+  private async _authFlow(action: string, data: object): Promise<AuthResultInterface> {
+    try {
+      this._clearState();
+      const resp = await this._dispatch({ action, ...data });
+      if (resp.ok) {
+        this._setAuthData(resp.data);
+        return AuthResultOk(resp.data);
+      }
+      return AuthResultErr(resp.error);
+    } catch (error) {
+      return AuthResultErr(error);
+    } finally {
+      this._purgeCache();
+    }
   }
 
   /**
@@ -578,7 +534,7 @@ class AuthClient {
       if (this._isTokenValid(token)) {
         this._setState(token);
         return true;
-      } else if (token.refresh_token) {
+      } else if (token?.refresh_token) {
         return await this._refreshToken(token.refresh_token, token.id_token);
       }
     } else {
@@ -802,7 +758,7 @@ class AuthClient {
  * @returns An instance of AuthClient.
  */
 export default (dispatch: DispatchType, authStorageKey: string | null = null): AuthClient => {
-  const storageKey = authStorageKey || 'singlebase:auth';
+  const storageKey = authStorageKey || 'singlebase.auth';
   const storage = useStorage(storageKey);
   return new AuthClient(dispatch, storage);
 };

@@ -65,12 +65,12 @@
     const email3 = "updatejack@city.com"
     const emailx = `e-${Date.now()}@city.com`
     res = await datastore.set(collectionName, {"email": email0})
-    _key = res?.ok ? res?.data[0]?._key : null
-    console.log("#set (insert)", res.ok, _key, res?.data[0]?.email, res?.data[0]?.email === email0)
+    _key = res?.ok ? res?.data?._key : null
+    console.log("#set (insert)", res.ok, _key, res?.data?.email, res?.data?.email === email0)
     console.log("... start #set-update")
     res = await datastore.set(collectionName, _key, {"email": email1})
-    _key = res?.ok ? res?.data[0]?._key : null
-    console.log("#set (update)", res.ok, _key, res?.data[0]?.email, res?.data[0]?.email === email1)
+    _key = res?.ok ? res?.data?._key : null
+    console.log("#set (update)", res.ok, _key, res?.data?.email, res?.data?.email === email1)
 
     //-- get 
     console.log("... start #get")
