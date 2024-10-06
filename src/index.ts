@@ -95,7 +95,7 @@ async function makeRequest(
   const headers: Record<string, any> = { ...dispatchOptions.headers };
 
   // set Headers Authorization
-  dispatchOptions?.setHeadersAuthorizationBearer?.(headers)
+  await dispatchOptions?.setHeadersAuthorizationBearer?.(headers)
 
   // Transform request data if a transform function is provided
   const data = dispatchOptions.transformRequest
@@ -252,10 +252,9 @@ const createClient = ({
    * Set the authorization headers
    * @param headers 
    */
-  const setHeadersAuthorizationBearer = (headers) => {
+  const setHeadersAuthorizationBearer = async (headers) => {
     if (clients?.auth) {
-      //const idToken = await getAuth().getIdToken()
-      const idToken = getAuth()?.idToken; 
+      const idToken = await getAuth().getIdToken()
       headers['Authorization'] = idToken ? `Bearer ${idToken}` : ''
     } else {
       headers['Authorization'] = ''
