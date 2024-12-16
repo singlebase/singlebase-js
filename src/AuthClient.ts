@@ -6,7 +6,7 @@ import {
   splitFullName,
   AuthResultOk,
   AuthResultErr,
-  useStorage,
+  TimeStorage
 } from './lib';
 
 import {
@@ -45,7 +45,7 @@ class AuthClient {
   /** Dispatcher function for handling authentication actions */
   private readonly _dispatch: DispatchType;
   /** Storage utility for persisting authentication data */
-  private readonly _storage: ReturnType<typeof useStorage>;
+  private readonly _storage: ReturnType<typeof TimeStorage>;
   /** Reactive state holding authentication data */
   private readonly _state: AuthStateType;
   private _user_profile: object | null;
@@ -62,6 +62,7 @@ class AuthClient {
   private _refreshFailed: boolean;
   /* Hold the resfreshed queue data */
   private _refreshQueue: Promise<boolean> | null = null;
+  private readonly _autoRefreshToken: boolean;
 
   
   /**
@@ -70,7 +71,7 @@ class AuthClient {
    * @param dispatch - The dispatch function for handling authentication actions.
    * @param storage - The storage utility for persisting authentication data.
    */
-  constructor(dispatch: DispatchType, storage: ReturnType<typeof useStorage>) {
+  constructor(dispatch: DispatchType, storage: ReturnType<typeof TimeStorage>) {
     this._dispatch = dispatch;
     this._storage = storage;
     this.settings = null;
@@ -96,12 +97,12 @@ class AuthClient {
     if (!this._initialized) {
       this._initialized = true;
       this._addStorageEventListener();
+      await this.loadSettings();
     }
 
     /** reload some data if necessary */
     await this._loadFromCache();
-    await this.loadSettings();
-
+    
     if (opt?.session === true && !this._session_active) {
       this._session_active = true
       this._startAutoRefreshToken();
@@ -146,21 +147,34 @@ class AuthClient {
   }
 
   /** 
-   * Checks if the user is authenticated based on the presence and validity of the token.
-   *
-   * @returns True if authenticated, false otherwise.
-   */
-  public get isAuthenticated(): boolean {
-    return !!(this._token?.id_token && this._isTokenValid(this._token));
-  }
-
-  /** 
    * Retrieves the current ID token (JWT) if authenticated.
    *
    * @returns The ID token string or null if not authenticated.
    */
   public get idToken(): string | null {
-    return this.isAuthenticated ? this._token?.id_token || null : null;
+    return this.isAuthenticated() ? this._token?.id_token || null : null;
+  }
+
+  /** 
+   * Checks if the user is authenticated based on the presence and validity of the token.
+   *
+   * @returns True if authenticated, false otherwise.
+   */
+  public isAuthenticated(): boolean {
+    return !!(this._isTokenValid(this._token));
+  }
+
+  /**
+   * Ensure the user is authenticated or it will attempt to refresh the session
+   * 
+   * @returns Promise resolve to Boolen
+   */
+  public async ensureSession(): Promise<boolean> {
+    if(this.isAuthenticated()) return true
+    if (await this.refreshSession()) {
+      return true
+    }
+    return false
   }
 
   /**
@@ -230,16 +244,14 @@ class AuthClient {
    */
   public async signInWithOAuth(provider: string): Promise<AuthResultInterface> {
     try {
-      this._clearState();
+      this._clearAuthData()
       const nonce = await this.getNonce();
 
       if (!nonce) {
-        this._clearState();
-        this._purgeCache();
         return AuthResultErr('Failed to obtain nonce.');
       }
 
-      this._storage.set(STORAGE_NONCE_KEY, nonce);
+      this._storage.setItem(STORAGE_NONCE_KEY, nonce);
       const resp = await this._dispatch({
         action: 'auth.oauth_connect',
         intent: 'signup', // Can be 'signup' or 'signin'
@@ -255,11 +267,10 @@ class AuthClient {
           action: 'REDIRECT',
         });
       }
-
+      this._clearAuthData();
       return AuthResultErr(resp.error);
     } catch (error) {
-      this._clearState();
-      this._purgeCache();
+      this._clearAuthData();
       return AuthResultErr(error);
     }
   }
@@ -276,22 +287,19 @@ class AuthClient {
     nonce: string | null = null
   ): Promise<AuthResultInterface> {
     try {
-      this._stopAutoRefreshToken();
+
+      this._clearAuthData();
 
       if (!nonce) {
-        nonce = this._storage.get(STORAGE_NONCE_KEY);
+        nonce = this._storage.getItem(STORAGE_NONCE_KEY);
       }
 
       if (!nonce) {
-        this._clearState();
-        this._purgeCache();
         return AuthResultErr('Missing nonce.');
       }
 
       const token = this._getToken();
       if (!token) {
-        this._clearState();
-        this._purgeCache();
         return AuthResultErr('Missing token.');
       }
 
@@ -310,13 +318,8 @@ class AuthClient {
         const userProfile = resp.data?.user_profile;
         return AuthResultOk(userProfile);
       }
-
-      this._clearState();
-      this._purgeCache();
       return AuthResultErr(resp.error || 'OAuth access code sign-in failed.');
     } catch (error) {
-      this._clearState();
-      this._purgeCache();
       return AuthResultErr(error);
     }
   }
@@ -347,8 +350,7 @@ class AuthClient {
     } catch (error) {
       return false;
     } finally {
-      this._clearState();
-      this._purgeCache();
+      this._clearAuthData();
     }
   }
 
@@ -426,25 +428,12 @@ class AuthClient {
    * @returns A promise resolving to the authentication result containing the settings.
    */
   public async loadSettings(): Promise<boolean> {
-    let settings = null
-    try {
-      settings = this._storage.get(STORAGE_SETTINGS_KEY)
-      if (!settings) {
-        const resp = await this._dispatch({ action: 'auth.settings' });
-        if (resp.ok) {
-          settings = resp.data;
-          this._storage.set(STORAGE_SETTINGS_KEY, settings)
-        } else {
-          settings = null;
-        }
-      }
-    } catch (error) {
-      this.settings = null;
-    }
-    this.settings = settings
-    return settings !== null
+    if (this.settings) return true
+    this.settings = null
+    const resp = await this._dispatch({ action: 'auth.settings' });
+    this.settings = resp?.ok ? resp.data : null
+    return this.settings !== null
   }
-
   /**
    * Subscribes to state changes in the authentication state.
    *
@@ -509,7 +498,7 @@ class AuthClient {
 
   private async _authFlow(action: string, data: object): Promise<AuthResultInterface> {
     try {
-      this._clearState();
+      this._clearAuthData();
       const resp = await this._dispatch({ action, ...data });
       if (resp.ok) {
         this._setAuthData(resp.data);
@@ -518,9 +507,7 @@ class AuthClient {
       return AuthResultErr(resp.error);
     } catch (error) {
       return AuthResultErr(error);
-    } finally {
-      this._purgeCache();
-    }
+    } 
   }
 
   /**
@@ -532,13 +519,13 @@ class AuthClient {
     const token = this._getCachedToken();
     if (token) {
       if (this._isTokenValid(token)) {
-        this._setState(token);
+        this._setAuthData(token);
         return true;
       } else if (token?.refresh_token) {
         return await this._refreshToken(token.refresh_token, token.id_token);
       }
     } else {
-      this._clearState();
+      this._clearAuthData();
     }
     return false;
   }
@@ -558,27 +545,10 @@ class AuthClient {
    * @returns The cached token object or null if not found.
    */
   private _getCachedToken(): IOResponseType | null {
-    return this._storage.get(STORAGE_TOKEN_KEY);
+    return this._storage.getItem(STORAGE_TOKEN_KEY);
   }
 
-  /**
-   * Removes the cached token from storage.
-   *
-   * @returns A promise resolving to a boolean indicating the success of the purge operation.
-   */
-  private _purgeCache(): Promise<boolean> {
-    return this._storage.remove(STORAGE_TOKEN_KEY);
-  }
 
-  /**
-   * Sleeps for a given duration.
-   *
-   * @param ms - The number of milliseconds to sleep.
-   * @returns A promise that resolves after the specified duration.
-   */
-  private _sleep(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
-  }
 
   /**
    * Attempts to refresh the authentication token using the provided refresh token and ID token.
@@ -634,10 +604,8 @@ class AuthClient {
    * @returns True if the token is valid, false otherwise.
    */
   private _isTokenValid(token: IOResponseType | null = null): boolean {
-    const currentToken = token || this._getToken();
-    if (currentToken?.id_token && currentToken?.token_info?.exp) {
-      const valid = (currentToken?.token_info?.exp * 1000) - (EXPIRY_MARGIN * 1000) > Date.now()
-      return valid;
+    if (token && token?.id_token && token?.token_info?.exp) {
+      return (token?.token_info?.exp * 1000) - (EXPIRY_MARGIN * 1000) > Date.now()
     }
     return false;
   }
@@ -647,26 +615,44 @@ class AuthClient {
    *
    * @param respData - The response data containing authentication tokens and user profile.
    */
-  private _setAuthData(respData: object): void {
-    this._stopAutoRefreshToken();
+
+  private _setAuthData(data: object): void {
     const now = Date.now();
-    const data = { ...respData, expires_at: now + parseInt((respData as any)?.token_info?.ttl, 10) * 1000, created_at: now };
-    this._setState(data);
-    this._storage.set(STORAGE_TOKEN_KEY, { ...respData, _rev: now });
-    this._startAutoRefreshToken();
+    const tokenData = {
+      ...data,
+      expires_at: now + parseInt((data as any)?.token_info?.ttl, 10) * 1000,
+      created_at: now,
+    };
+
+    this._user_profile = (data as any)?.user_profile || null;
+    this._token = tokenData;
+
+    this._state.__patch__ = {
+      user_profile: this._user_profile,
+      token: this._token,
+    };
+
+    this._storage.setItem(STORAGE_TOKEN_KEY, tokenData);
+
+    if (this._autoRefreshToken) {
+      this._startAutoRefreshToken();
+    }
   }
+
 
   /**
    * Clears the authentication state by resetting user profile and token data.
+   * _clearAuthData
    */
-  private _clearState(): void {
-    this._stopAutoRefreshToken();
-    this._user_profile = null 
-    this._token = null 
+  private _clearAuthData(): void {
+    this._user_profile = null;
+    this._token = null;
     this._state.__patch__ = {
       user_profile: null,
       token: null,
     };
+    this._stopAutoRefreshToken();
+    this._storage.removeItem(STORAGE_TOKEN_KEY);
   }
 
   /**
@@ -758,7 +744,7 @@ class AuthClient {
  * @returns An instance of AuthClient.
  */
 export default (dispatch: DispatchType, authStorageKey: string | null = null): AuthClient => {
-  const storageKey = authStorageKey || 'singlebase.auth';
-  const storage = useStorage(storageKey);
+  const storageKey = authStorageKey || 'singlebase.auth:';
+  const storage = new TimeStorage(storageKey);
   return new AuthClient(dispatch, storage);
 };

@@ -12,6 +12,7 @@
     <input type="submit" />
  </form>
 
+ <singlebase-authui></singlebase-authui>
  <div>
 
 
@@ -20,6 +21,7 @@
  </div>
   
 <script type="module">
+
 
   //import createClient  from 'https://cdn.jsdelivr.net/npm/@singlebase/singlebase-js/+esm'
   // const API_URL = "https://cloud.singlebaseapis.com/api"
@@ -36,6 +38,18 @@
     api_key: API_KEY
   }
   const client = createClient(singlebaseConfig)
+
+  const auth = client.useAuth()
+
+  client.initAuthUI({
+    signinCallback: () => {}
+  }, true) 
+
+  if (await auth.ensureSession()) {
+    console.log("We're in")
+  } else {
+    console.error("We're out!")
+  }
 
  /**
   * 

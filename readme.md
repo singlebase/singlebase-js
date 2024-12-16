@@ -83,7 +83,7 @@ const singlebase = createClient(createClientConfig)
 - singlebase.useDatastore()
 - singlebase.useAuth()
 - singlebase.useFilestore()
-- singlebase.useLLM()
+- singlebase.useGenAI()
 
 
 // 
@@ -95,6 +95,7 @@ const datastore = singlebase.useDatastore()
 - datastore.list
 - datastore.set
 - datastore.get
+- datastore.insert
 - datastore.update
 - datastore.delete
 - datastore.upsert
@@ -150,9 +151,23 @@ if (res.ok) {
   console.log(`Welcome ${res?.data?.display_name}`)
 }
 
-// -- LLM
-const llm = singlebase.useLLM()
-// WIP
+// -- GenAI
+const genAI = singlebase.useGenAI()
+
+// methods
+- genAI.fileToMarkdown
+- !genAI.genText
+- !genAI.genTextEmbeddings
+- !genAI.genFileEmbeddings
+- !genAI.summarizeText
+- !genAI.summarizeFile
+
+const fileKey = "xxxxxxxxx"
+
+const res = await genAI.fileToMarkdown(fileKey)
+if (res.ok) {
+  const output = resp?.data?.output
+}
 
 ```
 

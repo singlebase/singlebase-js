@@ -120,146 +120,75 @@ export const AuthResultErr = (error:any, action:string|null=null): AuthResultInt
 
 
 /**
- * MemCache
- * A localStorage/sessionStorage wrapper that adds TTL (Time-To-Live) functionality.
- * 
- * Methods:
- *  - set(key: string, data: any, ttl?: number): any
- *  - get(key: string): any | undefined
- *  - remove(key: string): boolean
- *  - purge(): void
- *  - parseData(data: string | null): Record<string, [number, any]>
+ * Class to handle storage with automatic expiry functionality.
+ * Supports both localStorage and sessionStorage with configurable TTL.
  */
-
-type StorageOptions = {
-  namespace?: string;
-  storage?: Storage;
-};
-
-type CacheEntry = [number, any]; // [TTL, Data]
-type CacheData = Record<string, CacheEntry>;
-
-const memcache = (db: string = "__default__", options: StorageOptions = {}) => {
-  const { namespace = 'c0', storage = window.sessionStorage } = options;
-  const fullNamespace = `${namespace}:${db}`;
+export class TimeStorage {
+  /**
+   * @param {string} keyPrefix - Prefix to append to all keys.
+   * @param {number} defaultTTL - Default time-to-live (TTL) for items in seconds.
+   * @param {'local' | 'session'} storageType - Type of storage to use ('local' for localStorage, 'session' for sessionStorage).
+   */
+  constructor(keyPrefix = 'singlebase.__default__:', defaultTTL = 3600, storageType = 'local') {
+    this.storage = storageType === 'session' ? window.sessionStorage : window.localStorage;
+    this.defaultTTL = defaultTTL;
+    this.keyPrefix = keyPrefix;
+  }
 
   /**
-   * Parses the stored JSON data.
-   * @param data - JSON string from storage.
-   * @returns Parsed CacheData or an empty object on failure.
+   * Stores an item in the storage with a specified TTL.
+   * @param {string} key - The key under which the item is stored.
+   * @param {*} value - The value to store.
+   * @param {number} [timeoutInSeconds] - Optional TTL in seconds. Defaults to the class defaultTTL.
    */
-  const parseData = (data: string | null): CacheData => {
-    if (!data) return {};
+  setItem(key, value, timeoutInSeconds = this.defaultTTL) {
+    const expiry = Date.now() + timeoutInSeconds * 1000;
+    const data = { value, expiry };
+    this.storage.setItem(this.keyPrefix + key, JSON.stringify(data));
+  }
+
+  /**
+   * Retrieves an item from the storage, if it hasn't expired.
+   * @param {string} key - The key of the item to retrieve.
+   * @returns {*} The value of the item, or null if it has expired or doesn't exist.
+   */
+  getItem(key) {
+    const storedData = this.storage.getItem(this.keyPrefix + key);
+    if (!storedData) return null;
+
     try {
-      return JSON.parse(data) as CacheData;
-    } catch {
-      console.warn(`Failed to parse data for namespace "${fullNamespace}". Resetting cache.`);
-      return {};
-    }
-  };
-
-  /**
-   * Retrieves the current cache data from storage.
-   * @returns CacheData object.
-   */
-  const getData = (): CacheData => parseData(storage.getItem(fullNamespace));
-
-  /**
-   * Saves the provided cache data back to storage.
-   * @param data - CacheData object to save.
-   */
-  const setData = (data: CacheData): void => {
-    try {
-      storage.setItem(fullNamespace, JSON.stringify(data));
-    } catch (e) {
-      console.error(`Failed to set data for namespace "${fullNamespace}":`, e);
-    }
-  };
-
-  /**
-   * Sets a key-value pair in the cache with an optional TTL.
-   * @param key - The key to set.
-   * @param data - The data to store.
-   * @param ttl - Time-To-Live in seconds. Defaults to 0 (no expiration).
-   * @returns The stored data.
-   */
-  const set = (key: string, data: any, ttl: number = 0): any => {
-    const currentData = getData();
-    const expiration = ttl > 0 ? Date.now() + ttl * 1000 : 0;
-    currentData[key] = [expiration, data];
-    setData(currentData);
-    return data;
-  };
-
-  /**
-   * Retrieves the data for a given key if it hasn't expired.
-   * @param key - The key to retrieve.
-   * @returns The stored data or undefined if not found or expired.
-   */
-  const get = (key: string): any | undefined => {
-    const currentData = getData();
-    const entry = currentData[key];
-
-    if (!entry) return undefined;
-
-    const [ttl, value] = entry;
-
-    if (ttl === 0 || Date.now() <= ttl) {
+      const { value, expiry } = JSON.parse(storedData);
+      if (Date.now() > expiry) {
+        this.removeItem(key);
+        return null; // Item has expired
+      }
       return value;
-    } else {
-      remove(key); // Clean up expired entry
-      return undefined;
+    } catch (error) {
+      console.error('Error parsing data from storage:', error);
+      return null;
     }
-  };
+  }
 
   /**
-   * Removes a specific key from the cache.
-   * @param key - The key to remove.
-   * @returns True if the key was removed, false otherwise.
+   * Removes an item from the storage.
+   * @param {string} key - The key of the item to remove.
    */
-  const remove = (key: string): boolean => {
-    const currentData = getData();
-    if (key in currentData) {
-      delete currentData[key];
-      setData(currentData);
-      return true;
-    }
-    return false;
-  };
+  removeItem(key) {
+    this.storage.removeItem(this.keyPrefix + key);
+  }
 
   /**
-   * Clears all entries in the current namespace.
+   * Clears all expired items from the storage.
    */
-  const purge = (): void => {
-    storage.removeItem(fullNamespace);
-  };
-
-  return {
-    namespace: fullNamespace,
-    set,
-    get,
-    remove,
-    purge,
-    parseData,
-  };
-};
-
-/**
- * Creates a storage instance using localStorage.
- * @param db - The database namespace.
- * @returns A memcache instance.
- */
-export const useStorage = (db: string = '__default__') => 
-  memcache(db, { storage: window.localStorage });
-
-/**
- * Creates a storage instance using sessionStorage.
- * @param db - The database namespace.
- * @returns A memcache instance.
- */
-export const useTempStorage = (db: string = '__default__') => 
-  memcache(db, { storage: window.sessionStorage });
-
+  clearExpiredItems() {
+    for (let i = 0; i < this.storage.length; i++) {
+      const key = this.storage.key(i);
+      if (key && key.startsWith(this.keyPrefix)) {
+        this.getItem(key.substring(this.keyPrefix.length)); // `getItem` will remove it if it's expired
+      }
+    }
+  }
+}
 
 
 export function parseXmlToJson(xml) {

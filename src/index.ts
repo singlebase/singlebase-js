@@ -29,7 +29,7 @@
 import AuthClient from './AuthClient';
 import Filestore from './Filestore';
 import Datastore from './Datastore';
-import LLM from './LLM';
+import GenAI from './GenAI';
 
 import {
   SinglebaseResponseType,
@@ -56,7 +56,7 @@ interface SinglebaseClient {
   useAuth: () => ReturnType<typeof AuthClient>;
   useFilestore: () => ReturnType<typeof Filestore>;
   useDatastore: () => ReturnType<typeof Datastore>;
-  useLLM: () => ReturnType<typeof LLM>;
+  useGenAI: () => ReturnType<typeof GenAI>;
   initAuthUI: (authUIConfig?: Record<string, any>) => void;
   initAuthSession: (opt?: Record<string, any>) => void;
 }
@@ -232,7 +232,7 @@ const createClient = ({
     auth: null as ReturnType<typeof AuthClient> | null,
     filestore: null as ReturnType<typeof Filestore> | null,
     datastore: null as ReturnType<typeof Datastore> | null,
-    llm: null as ReturnType<typeof LLM> | null,
+    genAI: null as ReturnType<typeof GenAI> | null,
   };
 
   // Merge headers, giving precedence to default headers
@@ -396,15 +396,15 @@ const createClient = ({
     },
 
     /**
-     * Access LLM functionalities.
+     * Access GenAI functionalities.
      *
-     * @returns The LLM client.
+     * @returns The GenAI client.
      */
-    useLLM: (): ReturnType<typeof LLM> => {
-      if (!clients.llm) {
-        clients.llm = new LLM(dispatch);
+    useGenAI: (): ReturnType<typeof GenAI> => {
+      if (!clients.genAI) {
+        clients.genAI = new GenAI(dispatch);
       }
-      return clients.llm;
+      return clients.genAI;
     },
 
     /**
