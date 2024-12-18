@@ -38,6 +38,7 @@ const MAX_RETRIES = 10;
 /** Interval (in deciseconds) between retry attempts */
 const RETRY_INTERVAL = 2;
 
+
 /**
  * AuthClient handles user authentication, including sign-up, sign-in, token management, and OAuth flows.
  */
@@ -64,7 +65,15 @@ class AuthClient {
   private _refreshQueue: Promise<boolean> | null = null;
   private readonly _autoRefreshToken: boolean;
 
-  
+  /** Minimum interval between refresh attempts in milliseconds */
+  private static readonly MIN_REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes
+  /** Time of the last refresh attempt */
+  private _lastRefreshAttempt: number = 0;
+  /** Maximum number of consecutive refresh failures before stopping attempts */
+  private static readonly MAX_REFRESH_FAILURES = 3;
+  /** Counter for consecutive refresh failures */
+  private _consecutiveRefreshFailures: number = 0;
+
   /**
    * Initializes a new instance of AuthClient.
    *
@@ -561,12 +570,26 @@ class AuthClient {
 
   private async _refreshToken(refresh_token: string, id_token: string): Promise<boolean> {
     if (!refresh_token || !id_token) return false;
-  
+
+    // Check if sufficient time has passed since last refresh attempt
+    const now = Date.now();
+    if (now - this._lastRefreshAttempt < AuthClient.MIN_REFRESH_INTERVAL) {
+      return false;
+    }
+
+    // Check if we've hit the maximum number of consecutive failures
+    if (this._consecutiveRefreshFailures >= AuthClient.MAX_REFRESH_FAILURES) {
+      this._clearAuthData(); // Clear auth data and stop refresh attempts
+      return false;
+    }
+
+    // Implement refresh queue if there's already a refresh in progress
     if (!this._refreshQueue) {
       this._refreshQueue = this._executeRefresh(refresh_token, id_token);
     }
-  
+
     try {
+      this._lastRefreshAttempt = now;
       return await this._refreshQueue;
     } finally {
       this._refreshQueue = null;
@@ -583,20 +606,24 @@ class AuthClient {
         refresh_token,
         id_token,
       });
-  
+
       if (resp?.ok) {
         this._setAuthData(resp.data);
         this._refreshFailed = false;
+        this._consecutiveRefreshFailures = 0; // Reset failure counter on success
         return true;
       } else {
         this._refreshFailed = true;
+        this._consecutiveRefreshFailures++;
         return false;
       }
     } catch {
       this._refreshFailed = true;
+      this._consecutiveRefreshFailures++;
       return false;
     }
   }
+
   /**
    * Checks if the provided token is valid based on its expiry time.
    *
@@ -604,10 +631,18 @@ class AuthClient {
    * @returns True if the token is valid, false otherwise.
    */
   private _isTokenValid(token: IOResponseType | null = null): boolean {
-    if (token && token?.id_token && token?.token_info?.exp) {
-      return (token?.token_info?.exp * 1000) - (EXPIRY_MARGIN * 1000) > Date.now()
+    if (!token?.id_token || !token?.token_info?.exp) {
+      return false;
     }
-    return false;
+
+    // Check if we've exceeded maximum refresh failures
+    if (this._consecutiveRefreshFailures >= AuthClient.MAX_REFRESH_FAILURES) {
+      return false;
+    }
+
+    const now = Date.now();
+    const expiresAt = token.token_info.exp * 1000;
+    return expiresAt - (EXPIRY_MARGIN * 1000) > now;
   }
 
   /**
@@ -617,6 +652,10 @@ class AuthClient {
    */
 
   private _setAuthData(data: object): void {
+    // Reset refresh-related counters
+    this._consecutiveRefreshFailures = 0;
+    this._refreshFailed = false;
+    
     const now = Date.now();
     const tokenData = {
       ...data,
@@ -715,16 +754,34 @@ class AuthClient {
    */
   private _scheduleNextRefresh(): void {
     const token = this._getToken();
-    if (token && token.token_info && token.token_info.exp) {
-      const expiresIn = (token.token_info.exp * 1000) - Date.now() - (EXPIRY_MARGIN * 1000);
-      const refreshIn = Math.max(0, expiresIn);
-  
+    if (!token?.token_info?.exp || !this._session_active) {
+      return;
+    }
+
+    const now = Date.now();
+    const expiresAt = token.token_info.exp * 1000;
+    const expiresIn = expiresAt - now - (EXPIRY_MARGIN * 1000);
+
+    // Calculate refresh interval with exponential backoff
+    let refreshIn = Math.max(0, expiresIn);
+    if (this._consecutiveRefreshFailures > 0) {
+      const backoffFactor = Math.min(Math.pow(2, this._consecutiveRefreshFailures - 1), 60); // Max 1 hour
+      refreshIn = Math.min(refreshIn, AuthClient.MIN_REFRESH_INTERVAL * backoffFactor);
+    }
+
+    // Clear any existing timer
+    if (this._autoRefreshTicker) {
       clearTimeout(this._autoRefreshTicker);
+    }
+
+    // Schedule next refresh only if we haven't exceeded max failures
+    if (this._consecutiveRefreshFailures < AuthClient.MAX_REFRESH_FAILURES) {
       this._autoRefreshTicker = window.setTimeout(() => {
         this.getIdToken().then(() => this._scheduleNextRefresh());
       }, refreshIn);
     }
-  }  
+  }
+
   /**
    * Stops the auto-refresh mechanism.
    */

@@ -1,3 +1,7 @@
+0.3.x
+- added new class GenAI for AI content generation, #instance.useGenAI() 
+- added method in Filestore.uploadData(data:string, filename:string)
+- fixed AuthClient interval to request token
 
 0.2.x
 - Updated API

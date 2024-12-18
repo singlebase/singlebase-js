@@ -26,6 +26,86 @@ interface UploadOptionsInterface {
 type UploadResponseType = [object | null, object | null];
 
 /**
+ * Convert data to file object 
+ * @param data string - the data to upload. It can also be a Object that will be converted into json
+ * @param filename 
+ * @returns 
+ */
+export function createFile(data, filename = 'document.txt') {
+
+  // Validate filename
+  if (!filename || typeof filename !== 'string') {
+    throw new Error('Filename must be a non-empty string');
+  }
+
+  // Check if filename has an extension
+  if (!filename.includes('.')) {
+    throw new Error('Filename must have an extension (e.g., .txt, .json)');
+  }
+
+  // Validate if filename only has dots
+  if (filename.replace(/\./g, '').trim().length === 0) {
+    throw new Error('Invalid filename: cannot contain only dots');
+  }
+
+  // Get file extension from filename
+  const extension = filename.split('.').pop().toLowerCase();
+  
+  // Convert to text if data is an object
+  const text = typeof data === 'object' ? JSON.stringify(data, null, 2) : String(data);
+
+
+  // Map common text-based extensions to MIME types
+  const mimeTypes = {
+      // Text formats
+      'txt': 'text/plain',
+      'log': 'text/plain',
+      'cfg': 'text/plain',
+      'ini': 'text/plain',
+      
+      // Web formats
+      'html': 'text/html',
+      'htm': 'text/html',
+      'css': 'text/css',
+      'js': 'text/javascript',
+      'jsx': 'text/javascript',
+      'ts': 'text/typescript',
+      'tsx': 'text/typescript',
+      
+      // Data formats
+      'json': 'application/json',
+      'xml': 'text/xml',
+      'csv': 'text/csv',
+      'yaml': 'text/yaml',
+      'yml': 'text/yaml',
+      'toml': 'text/toml',
+      
+      // Documentation formats
+      'md': 'text/markdown',
+      'markdown': 'text/markdown',
+      'pdf': 'application/pdf',
+      'rtf': 'text/rtf',
+      'tex': 'text/x-tex',
+      'doc': 'application/msword',
+      'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+              
+      // Other formats
+      'svg': 'image/svg+xml',
+    
+  };
+  
+  // Get MIME type from extension or default to text/plain
+  const mimeType = mimeTypes[extension] || 'text/plain';
+  
+  // Create blob and file with automatic lastModified
+  const blob = new Blob([text], { type: mimeType });
+  return new File([blob], filename, { 
+      type: mimeType,
+      lastModified: Date.now()
+  });
+}
+
+/**
  * Filestore handles file-related operations such as fetching file info, uploading, deleting, and querying files.
  */
 export default class Filestore {
@@ -142,7 +222,7 @@ export default class Filestore {
   /**
    * Uploads a file to the server with optional configurations.
    *
-   * @param file - The file to be uploaded.
+   * @param file:File - The file to be uploaded.
    * @param opts - Optional configurations for the upload.
    *   @param opts.public_read - Whether the uploaded file should be publicly readable.
    *   @param opts.info - Additional metadata for the file.
@@ -242,6 +322,27 @@ export default class Filestore {
       });
       return this._createError("UNDEFINED ERROR")
     }
+  }
+
+  /**
+   * Upload data to be saved as file
+   *
+   * @param data:String - The data:string to be uploaded.
+   * @param filename - the filename with extension
+   * @param opts - Optional configurations for the upload.
+   *   @param opts.public_read - Whether the uploaded file should be publicly readable.
+   *   @param opts.info - Additional metadata for the file.
+   *     @param opts.info.title - The title of the file.
+   *     @param opts.info.description - The description of the file.
+   *     @param opts.info.tags - Tags associated with the file.
+   *   @param opts.folder - The folder to upload the file to.
+   *   @param opts.options - Additional options.
+   *     @param opts.options.profilephoto - Whether the file is a profile photo.
+   * @returns A promise resolving to a tuple where the first element is the file info object (if uploaded successfully) and the second element is the error object (if any).
+   */
+  public async uploadData(data, filename, opts:UploadOptionsInterface = {}) {
+    const file = createFile(data, filename)
+    return await this.upload(file, opts)
   }
 
   /**
