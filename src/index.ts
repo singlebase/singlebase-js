@@ -307,7 +307,7 @@ const createClient = ({
       // explicitely use `client.initAuthSession` to keep sesion alive
       setTimeout(async () => {
         try {
-          await clients?.auth.initSession({session: false}); // do not init session here. 
+          await clients?.auth?.initSession({session: false}); // do not init session here. 
         } catch (error) {
           console.error('Singlebase: AuthClient failed to initialize properly:', error);
         }
