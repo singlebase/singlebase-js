@@ -123,6 +123,7 @@ const filestore = singlebase.useFilestore()
 - filestore.makePublic
 - filestore.setMetadata
 - filestore.delete
+- filestore.uploadData
 
 // example
 // html: <input id="myInputFile" type="file" name="uploadFile" required />

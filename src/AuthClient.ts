@@ -404,17 +404,19 @@ class AuthClient {
    */
   public async getIdToken(refresh = true): Promise<string | null> {
     const token = this._getToken();
-    if (token) {
-      if (this._isTokenValid(token)) {
-        return token.id_token;
-      }
+    if (!token) return null;
 
-      if (refresh && token.refresh_token) {
-        if (await this._refreshToken(token.refresh_token, token.id_token)) {
-          return await this.getIdToken(false);
-        }
+    if (this._isTokenValid(token)) {
+      return token.id_token;
+    }
+
+    if (refresh && token.refresh_token && !this._refreshQueue) {
+      if (await this._refreshToken(token.refresh_token, token.id_token)) {
+        const newToken = this._getToken();
+        return newToken?.id_token || null;
       }
     }
+
     return null;
   }
 
@@ -571,25 +573,23 @@ class AuthClient {
   private async _refreshToken(refresh_token: string, id_token: string): Promise<boolean> {
     if (!refresh_token || !id_token) return false;
 
-    // Check if sufficient time has passed since last refresh attempt
     const now = Date.now();
     if (now - this._lastRefreshAttempt < AuthClient.MIN_REFRESH_INTERVAL) {
       return false;
     }
 
-    // Check if we've hit the maximum number of consecutive failures
     if (this._consecutiveRefreshFailures >= AuthClient.MAX_REFRESH_FAILURES) {
-      this._clearAuthData(); // Clear auth data and stop refresh attempts
+      this._clearAuthData();
       return false;
     }
 
-    // Implement refresh queue if there's already a refresh in progress
-    if (!this._refreshQueue) {
-      this._refreshQueue = this._executeRefresh(refresh_token, id_token);
+    if (this._refreshQueue) {
+      return this._refreshQueue;
     }
 
     try {
       this._lastRefreshAttempt = now;
+      this._refreshQueue = this._executeRefresh(refresh_token, id_token);
       return await this._refreshQueue;
     } finally {
       this._refreshQueue = null;
@@ -608,15 +608,15 @@ class AuthClient {
       });
 
       if (resp?.ok) {
-        this._setAuthData(resp.data);
+        this._setAuthData(resp.data, false);
         this._refreshFailed = false;
-        this._consecutiveRefreshFailures = 0; // Reset failure counter on success
+        this._consecutiveRefreshFailures = 0;
         return true;
-      } else {
-        this._refreshFailed = true;
-        this._consecutiveRefreshFailures++;
-        return false;
       }
+
+      this._refreshFailed = true;
+      this._consecutiveRefreshFailures++;
+      return false;
     } catch {
       this._refreshFailed = true;
       this._consecutiveRefreshFailures++;
@@ -651,7 +651,7 @@ class AuthClient {
    * @param respData - The response data containing authentication tokens and user profile.
    */
 
-  private _setAuthData(data: object): void {
+  private _setAuthData(data: object, startAutoRefresh: boolean = true): void {
     // Reset refresh-related counters
     this._consecutiveRefreshFailures = 0;
     this._refreshFailed = false;
@@ -673,7 +673,7 @@ class AuthClient {
 
     this._storage.setItem(STORAGE_TOKEN_KEY, tokenData);
 
-    if (this._autoRefreshToken) {
+    if (startAutoRefresh && this._autoRefreshToken) {
       this._startAutoRefreshToken();
     }
   }
