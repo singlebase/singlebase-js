@@ -451,7 +451,7 @@ class AuthClient {
    * @param callback - The function to call when the state changes.
    * @returns A subscription object that can be used to unsubscribe.
    */
-  public onStateChanged(callback: (changes: Partial<AuthStateType>, prev: Partial<AuthStateType>, state: AuthStateType) => void) {
+  public onStateChange(callback: (changes: Partial<AuthStateType>, prev: Partial<AuthStateType>, state: AuthStateType) => void) {
     return this._state.subscribe(callback);
   }
 
@@ -461,36 +461,26 @@ class AuthClient {
    * @param callback - The function to call when the authentication state changes.
    * @returns A subscription object that can be used to unsubscribe.
    */
-  public onSessionChanged(callback: (userProfile: UserInterface | null) => void) {
+  public onAuthStateChange(callback: (userProfile: UserInterface | null) => void) {
     // Invoke the callback immediately with the current state
     setTimeout(() => {
       callback(copy(this._user_profile));
     })
     
-    return this.onStateChanged((changes, prev) => {
+    return this.onStateChange((changes, prev) => {
       if (changes?.token?.id_token !== prev?.token?.id_token) {
         callback(copy(changes?.user_profile));
       }
     });
   }
 
-  /**
-   * @deprecated 
-   * @use onSessionChanged
-   * @param callback 
-   * @returns 
-   */
-  public onAuthStateChanged(callback: (userProfile: UserInterface | null) => void) {
-    console.warn("AuthClient Deprecation: @onAuthStateChanged - Use onSessionChanged")
-    return this.onSessionChanged(callback)
-  }
 
   /**
-   * Refreshes the authentication state by loading data from the cache.
+   * Reload the authentication state by loading data from the cache.
    *
    * @returns A promise resolving to a boolean indicating the success of the operation.
    */
-  public async refreshAuthState(): Promise<boolean> {
+  public async reloadAuthState(): Promise<boolean> {
     return this._loadFromCache();
   }
 

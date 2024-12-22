@@ -52,8 +52,8 @@ export default class GenAI {
    * @param fileKey - The fileunique key of the file.
    * @returns A promise resolving to the response.
    */
-  public async fileToMarkdown(fileKey: string): Promise<ResponseType> {
-    const res = await this._dispatch({ action: 'genai.markdown', input: fileKey });
+  public async convertFilestoreObjectToMarkdown(fileKey: string): Promise<ResponseType> {
+    const res = await this._dispatch({ action: 'genai.gen_markdown', input: fileKey });
     if (res.ok) {
       return this._createSuccess(res?.data, res?.meta)
     } else {

@@ -339,7 +339,7 @@ const createClient = ({
      * load the ui library: @singlebase/singlebase-authui
      */
     if (authUILib === true || (isPlainObject(authUILib) && !isEmpty(authUILib))) {
-      console.log("Singlebase: loading SinglbeaseAuthUI library...")
+      console.log("Singlebase: loading SinglebaseAuthUI library...")
       const _libVersion = authUILib?.version ?? 'latest';
       const _libModule =  authUILib?.module !== false;
       const _url = authUILib?.url ?? DEFAULT_AUTHUI_JS_PATH.replace("[[VERSION]]", `@${_libVersion}`);

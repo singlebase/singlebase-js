@@ -1,3 +1,7 @@
+0.4.x
+- remove onAuthStateChanged, onSessionChanged, onStateChanged
+- Added onAuthStateChange, onStateChange
+  
 0.3.x
 - added new class GenAI for AI content generation, #instance.useGenAI() 
 - added method in Filestore.uploadData(data:string, filename:string)

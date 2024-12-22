@@ -66,7 +66,7 @@ import createClient from '@singlebase/singlebase-js'
  *    api_key:str     // your api key
  */
 const createClientConfig = {
-  api_url: "https://cloud.singlebaseapis.com/api",
+  api_url: "https://cloud.singlebaseapis.com/api/######",
   api_key: "your-api-key"
 }
 
@@ -84,6 +84,7 @@ const singlebase = createClient(createClientConfig)
 - singlebase.useAuth()
 - singlebase.useFilestore()
 - singlebase.useGenAI()
+- singlebase.useVectorstore()
 
 
 // 
@@ -137,12 +138,17 @@ if (res.ok) {
 const auth = singlebase.useAuth()
 
 // methods
-- auth.signinWithPassword
+- auth.signInWithPassword
 - auth.signUpWithPassword
 - auth.updateAccount // change email, password, username
 - auth.updateProfile // change display_name, photo, metadata, etc..
 - auth.getUser
-- auth.onAuthStateChanged
+- auth.signOut
+- auth.isAuthenticated
+- auth.onAuthStateChange
+- auth.onStateChange
+- auth.reloadAuthState
+- auth.refreshSession
 
 // example
 const email = "x@y.com"
@@ -156,7 +162,7 @@ if (res.ok) {
 const genAI = singlebase.useGenAI()
 
 // methods
-- genAI.fileToMarkdown
+- genAI.convertFilestoreObjectToMarkdown
 - !genAI.genText
 - !genAI.genTextEmbeddings
 - !genAI.genFileEmbeddings
@@ -165,7 +171,7 @@ const genAI = singlebase.useGenAI()
 
 const fileKey = "xxxxxxxxx"
 
-const res = await genAI.fileToMarkdown(fileKey)
+const res = await genAI.convertFilestoreObjectToMarkdown(fileKey)
 if (res.ok) {
   const output = resp?.data?.output
 }
