@@ -46,40 +46,26 @@ export default class GenAI {
     };
   }
 
-  /**
-   * Convert a file to Markdown
-   *
-   * @param fileKey - The fileunique key of the file.
-   * @returns A promise resolving to the response.
-   */
-  public async convertFilestoreObjectToMarkdown(fileKey: string): Promise<ResponseType> {
-    const res = await this._dispatch({ action: 'genai.gen_markdown', input: fileKey });
-    if (res.ok) {
-      return this._createSuccess(res?.data, res?.meta)
-    } else {
-      return this._createError(res?.error)
-    }
+
+  public async gentext(input): Promise<ResponseType> {
+    throw new Error('NOT_IMPLEMENTED_YET_ERROR:gentext')
   }
 
-  public async genText(input): Promise<ResponseType> {
-    throw new Error('NOT_IMPLEMENTED_YET_ERROR:genText')
-  }
-
-  public async summarizeText(input): Promise<ResponseType> {
-    throw new Error('NOT_IMPLEMENTED_YET_ERROR:summarizeText')
+  public async summarize(input): Promise<ResponseType> {
+    throw new Error('NOT_IMPLEMENTED_YET_ERROR:summarize')
   }
 
 
-  public async summarizeFile(input): Promise<ResponseType> {
+  public async qna(input): Promise<ResponseType> {
+    throw new Error('NOT_IMPLEMENTED_YET_ERROR:qna')
+  }
+
+  public async summarizeFile(input, file_key): Promise<ResponseType> {
     throw new Error('NOT_IMPLEMENTED_YET_ERROR:summarizeFile')
   }
 
-  public async genTextEmbeddings(input): Promise<ResponseType> {
-    throw new Error('NOT_IMPLEMENTED_YET_ERROR:genTextEmbeddings')
-  }
-
-  public async genFileEmbeddings(input): Promise<ResponseType> {
-    throw new Error('NOT_IMPLEMENTED_YET_ERROR:genFileEmbeddings')
+  public async qnaFile(input, file_key): Promise<ResponseType> {
+    throw new Error('NOT_IMPLEMENTED_YET_ERROR:qnaFile')
   }
 }
 

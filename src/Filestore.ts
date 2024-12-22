@@ -161,7 +161,7 @@ export default class Filestore {
   public async get(filePathOrKey: string): Promise<ResponseType> {
     const _key = extractFileKey(filePathOrKey);
     if (_key) {
-      const res = await this._dispatch({ action: 'file.info', _key });
+      const res = await this._dispatch({ action: 'file.get', _key });
       if (res.ok) {
         return this._createSuccess(res?.data, res?.meta)
       } else {
@@ -343,6 +343,23 @@ export default class Filestore {
   public async uploadData(data, filename, opts:UploadOptionsInterface = {}) {
     const file = createFile(data, filename)
     return await this.upload(file, opts)
+  }
+
+
+  /**
+   * To convert a file to markdown.
+   *
+   * @param filePathOrKey - The file path or unique key of the file to delete.
+   * @returns A promise resolving to the result
+   */
+  public async convertToMarkdown(filePathOrKey: string): Promise<ResultType> {
+    const _key = extractFileKey(filePathOrKey);
+    const resp: ResponseType = await this._dispatch({ action: 'file.convert_to_markdown', _key });
+    if (resp.ok) {
+      return this._createSuccess(resp?.data, resp?.meta)
+    } else {
+      return this._createError(resp?.error)
+    }
   }
 
   /**

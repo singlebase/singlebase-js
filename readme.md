@@ -125,6 +125,7 @@ const filestore = singlebase.useFilestore()
 - filestore.setMetadata
 - filestore.delete
 - filestore.uploadData
+- filestore.convertToMarkdown
 
 // example
 // html: <input id="myInputFile" type="file" name="uploadFile" required />
@@ -162,19 +163,12 @@ if (res.ok) {
 const genAI = singlebase.useGenAI()
 
 // methods
-- genAI.convertFilestoreObjectToMarkdown
-- !genAI.genText
-- !genAI.genTextEmbeddings
-- !genAI.genFileEmbeddings
-- !genAI.summarizeText
-- !genAI.summarizeFile
+- genAI.gentext - To generate text based on prompt
+- genAI.summarize - Summarize
+- genAI.qna - To QnA document or content
+- genAI.summarizeFile 
+- genAI.qnaFile
 
-const fileKey = "xxxxxxxxx"
-
-const res = await genAI.convertFilestoreObjectToMarkdown(fileKey)
-if (res.ok) {
-  const output = resp?.data?.output
-}
 
 ```
 
