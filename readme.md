@@ -150,6 +150,7 @@ const auth = singlebase.useAuth()
 - auth.onStateChange
 - auth.reloadAuthState
 - auth.refreshSession
+- auth.ensureValidSession
 
 // example
 const email = "x@y.com"

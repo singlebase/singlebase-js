@@ -45,7 +45,7 @@
     signinCallback: () => {}
   }, true) 
 
-  if (await auth.ensureSession()) {
+  if (await auth.ensureValidSession()) {
     console.log("We're in")
   } else {
     console.error("We're out!")

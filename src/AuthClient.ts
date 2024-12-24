@@ -176,9 +176,9 @@ class AuthClient {
   /**
    * Ensure the user is authenticated or it will attempt to refresh the session
    * 
-   * @returns Promise resolve to Boolen
+   * @returns Promise resolve to Boolean
    */
-  public async ensureSession(): Promise<boolean> {
+  public async ensureValidSession(): Promise<boolean> {
     if(this.isAuthenticated()) return true
     if (await this.refreshSession()) {
       return true
