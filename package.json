@@ -1,7 +1,7 @@
 {
   "name": "@singlebase/singlebase-js",
   "pkgName": "singlebase-js",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Javascript/Typescript SDK for Singlebase's API",
   "homepage": "https://singlebase.cloud",
   "documentationURL": "https://docs.singlebasecloud.com/sdk/javascript",

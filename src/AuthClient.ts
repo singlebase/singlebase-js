@@ -125,7 +125,7 @@ class AuthClient {
    * @returns The user key or null if not available.
    */
   public get userKey(): string | null {
-    return this._user_profile?.user_key || null;
+    return this._user_profile?._userkey || null;
   }
 
   /** 
