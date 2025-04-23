@@ -51,7 +51,6 @@ export default class XAI {
 
     const res: ResponseType = await this._dispatch({
       action: "ai.invoke",
-      schedule: true,
       data,
       ...opts
     });
@@ -78,7 +77,7 @@ export default class XAI {
     }
   }
 
-  
+
   public async summarize(input): Promise<ResponseType> {
     throw new Error('NOT_IMPLEMENTED_YET_ERROR:summarize')
   }
