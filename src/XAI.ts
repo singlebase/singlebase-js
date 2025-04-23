@@ -1,9 +1,9 @@
-// GenAI.ts
+// XAI.ts
 
 import { ResponseType, ResultType, DispatchType } from "./types";
 
 
-export default class GenAI {
+export default class XAI {
   
   /** Dispatch function for executing actions */
   private readonly _dispatch: DispatchType;
@@ -47,10 +47,38 @@ export default class GenAI {
   }
 
 
-  public async gentext(input): Promise<ResponseType> {
-    throw new Error('NOT_IMPLEMENTED_YET_ERROR:gentext')
+  public async invoke(data:[], opts={}): Promise<ResponseType> {
+
+    const res: ResponseType = await this._dispatch({
+      action: "ai.invoke",
+      schedule: true,
+      data,
+      ...opts
+    });
+    if (res.ok) {
+      return this._createSuccess(res?.data, res?.meta)
+    } else {
+      return this._createError(res?.error)
+    }
   }
 
+
+  public async generate(user_input: string, opts={}): Promise<ResponseType> {
+    const res: ResponseType = await this._dispatch({
+      action: 'xai.generate',
+      data: {
+        user_input,
+        ...opts,
+      }
+    });
+    if (res.ok) {
+      return this._createSuccess(res?.data, res?.meta)
+    } else {
+      return this._createError(res?.error)
+    }
+  }
+
+  
   public async summarize(input): Promise<ResponseType> {
     throw new Error('NOT_IMPLEMENTED_YET_ERROR:summarize')
   }

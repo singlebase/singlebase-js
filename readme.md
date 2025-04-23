@@ -83,9 +83,7 @@ const singlebase = createClient(createClientConfig)
 - singlebase.useDatastore()
 - singlebase.useAuth()
 - singlebase.useFilestore()
-- singlebase.useGenAI()
-- singlebase.useVectorstore()
-
+- singlebase.useXAI()
 
 // 
 //-- Datastore
@@ -161,14 +159,13 @@ if (res.ok) {
 }
 
 // -- GenAI
-const genAI = singlebase.useGenAI()
+const xai = singlebase.useXAI()
 
 // methods
-- genAI.gentext - To generate text based on prompt
-- genAI.summarize - Summarize
-- genAI.qna - To QnA document or content
-- genAI.summarizeFile 
-- genAI.qnaFile
+- xai.generate - To generate text based on prompt
+- xai.summarize - Summarize
+- xai.qna - To QnA document or content
+- xai.invoke
 
 
 ```

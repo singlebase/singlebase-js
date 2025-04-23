@@ -29,7 +29,7 @@
 import AuthClient from './AuthClient';
 import Filestore from './Filestore';
 import Datastore from './Datastore';
-import GenAI from './GenAI';
+import XAI from './XAI';
 
 import {
   SinglebaseResponseType,
@@ -56,7 +56,7 @@ interface SinglebaseClient {
   useAuth: () => ReturnType<typeof AuthClient>;
   useFilestore: () => ReturnType<typeof Filestore>;
   useDatastore: () => ReturnType<typeof Datastore>;
-  useGenAI: () => ReturnType<typeof GenAI>;
+  useXAI: () => ReturnType<typeof XAI>;
   initAuthUI: (authUIConfig?: Record<string, any>) => void;
   initAuthSession: (opt?: Record<string, any>) => void;
 }
@@ -232,7 +232,7 @@ const createClient = ({
     auth: null as ReturnType<typeof AuthClient> | null,
     filestore: null as ReturnType<typeof Filestore> | null,
     datastore: null as ReturnType<typeof Datastore> | null,
-    genAI: null as ReturnType<typeof GenAI> | null,
+    genAI: null as ReturnType<typeof XAI> | null,
   };
 
   // Merge headers, giving precedence to default headers
@@ -396,13 +396,13 @@ const createClient = ({
     },
 
     /**
-     * Access GenAI functionalities.
+     * Access XAI functionalities.
      *
-     * @returns The GenAI client.
+     * @returns The XAI client.
      */
-    useGenAI: (): ReturnType<typeof GenAI> => {
+    useXAI: (): ReturnType<typeof XAI> => {
       if (!clients.genAI) {
-        clients.genAI = new GenAI(dispatch);
+        clients.genAI = new XAI(dispatch);
       }
       return clients.genAI;
     },

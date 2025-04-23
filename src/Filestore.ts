@@ -325,6 +325,138 @@ export default class Filestore {
   }
 
   /**
+   * Uploads multiple files to the server with optional configurations.
+   *
+   * @param files - An array of file objects, each containing a File and optional configurations.
+   *   @param files[].file - The File object to be uploaded.
+   *   @param files[].opts - Optional configurations specific to this file.
+   *     @param files[].opts.public_read - Whether the file should be publicly readable.
+   *     @param files[].opts.info - Additional metadata for the file.
+   *     @param files[].opts.folder - The folder to upload the file to.
+   *     @param files[].opts.options - Additional options for the file.
+   * @param globalOpts - Optional configurations that apply to all files if not overridden.
+   * @returns A promise resolving to a tuple where the first element is an array of file info objects (if uploaded successfully) and the second element is the error object (if any).
+   */
+  public async multi_upload(
+    files: Array<{file: File, opts?: UploadOptionsInterface}>, 
+    globalOpts: UploadOptionsInterface = {}
+  ): Promise<ResultType> {
+
+    try {
+      // Prepare file metadata for the batch preupload request
+      const filesMetadata = files.map(item => {
+        // Merge global options with file-specific options
+        const mergedOpts = {
+          ...globalOpts,
+          ...item.opts
+        };
+        
+        return {
+          filename: item.file.name,
+          content_type: item.file.type,
+          ...mergedOpts
+        };
+      });
+
+      // PREUPLOAD: Request presigned URLs and upload info for all files
+      const presignedPostBatch: ResponseType = await this._dispatch({
+        action: 'file.preupload',
+        files: filesMetadata
+      });
+
+      if (!presignedPostBatch.ok) {
+        return this._createError(presignedPostBatch.error || { error: "BATCH PREUPLOAD FAILED" });
+      }
+
+      // Get the array of presigned data from the response
+      const presignedDataArray = presignedPostBatch.data?.files;
+      
+      if (!Array.isArray(presignedDataArray) || presignedDataArray.length !== files.length) {
+        return this._createError({ error: "INVALID PRESIGNED DATA ARRAY" });
+      }
+
+      // Upload each file in parallel using the presigned data
+      const uploadPromises = files.map(async (item, index) => {
+        const file = item.file;
+        const presignedData = presignedDataArray[index]?.presigned_data;
+        
+        if (!presignedData || !presignedData.url || !presignedData.fields) {
+          return {
+            success: false,
+            error: "INVALID PRESIGNED DATA FOR FILE",
+            file: file.name,
+            presigned_data: presignedData,
+            _key: presignedData?._key
+          };
+        }
+        
+        // Create FormData for upload
+        const formData = new FormData();
+        Object.entries(presignedData.fields).forEach(([key, value]) => {
+          formData.append(key, value as string);
+        });
+        formData.append('file', file);
+
+        try {
+          // SUBMIT form to the presigned_data.url
+          const res = await httpx({
+            method: 'POST',
+            url: presignedData.url,
+            data: formData
+          });
+
+          if (res.ok) {
+            return {
+              success: true,
+              file: file.name,
+              presigned_data: presignedData,
+              _key: presignedData?._key
+            };
+          } else {
+            return {
+              success: false,
+              error: res.error,
+              file: file.name,
+              presigned_data: presignedData,
+              _key: presignedData?._key
+            };
+          }
+        } catch (e: any) {
+          return {
+            success: false,
+            error: `${e}`,
+            file: file.name,
+            presigned_data: presignedData,
+            _key: presignedData?._key
+          };
+        }
+      });
+
+      // Wait for all uploads to complete
+      const uploadResults = await Promise.all(uploadPromises);
+
+      // Notify server about the results of all uploads (both successes and failures)
+      const postUpload = await this._dispatch({
+        action: 'file.postupload',
+        files: uploadResults
+      });
+
+      if (postUpload?.ok) {
+        return this._createSuccess(postUpload?.data);
+      } else {
+        return this._createError("ERROR BATCH POSTUPLOAD");
+      }
+      
+    } catch (error) {
+      // Handle any unexpected errors during batch upload
+      await this._dispatch({
+        action: 'file.uploaderror',
+        errors: { error: "UNDEFINED BATCH ERROR" }
+      });
+      return this._createError("UNDEFINED BATCH ERROR");
+    }
+  } 
+  /**
    * Upload data to be saved as file
    *
    * @param data:String - The data:string to be uploaded.
@@ -346,21 +478,6 @@ export default class Filestore {
   }
 
 
-  /**
-   * To convert a file to markdown.
-   *
-   * @param filePathOrKey - The file path or unique key of the file to delete.
-   * @returns A promise resolving to the result
-   */
-  public async convertToMarkdown(filePathOrKey: string): Promise<ResultType> {
-    const _key = extractFileKey(filePathOrKey);
-    const resp: ResponseType = await this._dispatch({ action: 'file.convert_to_markdown', _key });
-    if (resp.ok) {
-      return this._createSuccess(resp?.data, resp?.meta)
-    } else {
-      return this._createError(resp?.error)
-    }
-  }
 
   /**
    * Deletes a file based on its file path or key.
