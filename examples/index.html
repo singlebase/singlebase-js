@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>singlebase-authui — local example</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #F4F4F3;
+    font-family: 'Geist', -apple-system, 'Segoe UI', Helvetica, sans-serif;
+    color: #16181A;
+    padding: 48px;
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+  }
+  .eyebrow {
+    font-family: 'Geist Mono', ui-monospace, monospace;
+    font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: #61666C;
+  }
+  h1 { font-size: 28px; font-weight: 600; letter-spacing: -0.02em; }
+  p.lede { font-size: 14.5px; line-height: 1.55; color: #41464B; max-width: 62ch; }
+  .row { display: flex; flex-wrap: wrap; gap: 28px; align-items: flex-start; }
+  .col { display: flex; flex-direction: column; gap: 10px; width: 420px; }
+  .caption { display: flex; align-items: baseline; gap: 10px; }
+  .badge {
+    font-family: 'Geist Mono', ui-monospace, monospace; font-size: 11px; font-weight: 500;
+    letter-spacing: .06em; border: 1px solid #D6D8DA; border-radius: 3px; padding: 2px 6px;
+  }
+  .cap-name { font-size: 13px; font-weight: 500; }
+  .cap-note { font-size: 12.5px; color: #61666C; }
+  details { background: #fff; border: 1px solid #E4E6E9; border-radius: 8px; padding: 12px 16px; max-width: 560px; font-size: 13px; }
+  summary { cursor: pointer; font-weight: 600; }
+  details label { display: block; font-size: 12px; margin-top: 10px; color: #61666C; }
+  details input { width: 100%; padding: 8px; margin-top: 4px; font: inherit; border: 1px solid #E4E6E9; border-radius: 4px; }
+  details button { margin-top: 12px; padding: 8px 14px; font: inherit; cursor: pointer; }
+  .split { width: 640px; }
+</style>
+</head>
+<body>
+
+<div>
+  <div class="eyebrow">Local example</div>
+  <h1>Singlebase auth widget</h1>
+  <p class="lede">
+    Runs offline against a mocked transport, so every screen is clickable with no backend:
+    sign in (a password under 8 characters fails; three failures triggers the lockout notice),
+    sign up, one-time code sign-in, password reset by code, invite setup, and the account view.
+    In any code screen, 000000 is rejected; six other digits pass.
+  </p>
+</div>
+
+<details>
+  <summary>Use a real backend</summary>
+  <label>Base URL <input id="cfg-baseUrl" placeholder="https://api.singlebase.cloud"></label>
+  <label>URL access key <input id="cfg-urlAccessKey" placeholder="your-url-access-key"></label>
+  <label>Web API key <input id="cfg-apiKey" placeholder="wk_..."></label>
+  <button id="cfg-apply">Reconnect with these settings</button>
+</details>
+
+<div class="row">
+  <div class="col">
+    <div class="caption">
+      <span class="badge">a</span><span class="cap-name">Inline card</span>
+      <span class="cap-note">black primary · 4px corners</span>
+    </div>
+    <singlebase-authui id="a"></singlebase-authui>
+  </div>
+
+  <div class="col">
+    <div class="caption">
+      <span class="badge">b</span><span class="cap-name">Invite</span>
+      <span class="cap-note">same widget, opened from an invite link</span>
+    </div>
+    <singlebase-authui
+      id="b"
+      screen="invite"
+      invite-email="ada@acme.com"
+      invite-org="Acme"
+      invite-code="123456"
+    ></singlebase-authui>
+  </div>
+
+  <div class="col">
+    <div class="caption">
+      <span class="badge">c</span><span class="cap-name">Providers only</span>
+      <span class="cap-note">email sign-in and code off</span>
+    </div>
+    <singlebase-authui
+      id="c"
+      allow-email-signin="false"
+      allow-email-signup="false"
+      allow-email-otp="false"
+    ></singlebase-authui>
+  </div>
+
+  <div class="col">
+    <div class="caption">
+      <span class="badge">d</span><span class="cap-name">Auth disabled</span>
+      <span class="cap-note">authEnabled false</span>
+    </div>
+    <singlebase-authui id="d" auth-enabled="false"></singlebase-authui>
+  </div>
+
+  <div class="col split">
+    <div class="caption">
+      <span class="badge">e</span><span class="cap-name">Split layout</span>
+      <span class="cap-note">brand panel · dark theme · custom accent</span>
+    </div>
+    <singlebase-authui
+      id="e"
+      layout="split"
+      theme="dark"
+      logo-text="ACME"
+      brand-line="One account for everything you build."
+      brand-foot="Secured by Singlebase"
+      tos-url="/terms"
+      privacy-url="/privacy"
+      style="--sb-accent:#2F5BEA"
+    ></singlebase-authui>
+  </div>
+</div>
+
+<script type="module">
+  // The standalone bundle carries Lit, core, auth and the service SDK, so a
+  // plain file:// page needs no bundler and no import map.
+  import { SinglebaseAuth } from "../packages/ui/dist/singlebase-authui.min.js";
+
+  const baseSettings = (over = {}) => ({
+    enabled: true,
+    auth_settings: {
+      enabled: true, allow_signin: true, allow_signup: true,
+      identifier: ["email"], signin_method: "password", second_factor: null,
+      signup_verify_email: false, account_update_verification: null,
+      password_policy: { NAME: "MEDIUM", LENGTH: [8, 64], SYMBOLS: false, NUMBERS: true, LOWERCASE: false, UPPERCASE: false },
+      ...over.auth_settings
+    },
+    oauth_settings: { enabled: true, allow_signin: true, allow_signup: true, ...over.oauth_settings },
+    oauth_providers: {
+      google: { enabled: true, type: "client", name: "google", provider_name: "Google" },
+      github: { enabled: true, type: "client", name: "github", provider_name: "GitHub" },
+      linkedin: { enabled: true, type: "client", name: "linkedin", provider_name: "LinkedIn" },
+      facebook: { enabled: true, type: "client", name: "facebook", provider_name: "Facebook" }
+    },
+    ...over.top
+  });
+
+  function mockFetch(settings) {
+    return async (_url, init) => {
+      const body = JSON.parse(init.body);
+      const ok = (data) => ({ ok: true, json: async () => ({ data, meta: {}, exec_time: 0.002 }) });
+      const err = (message, status = 400, type = "VALIDATION_ERROR") => ({
+        ok: true, json: async () => ({ error: { type, status, message }, meta: {}, exec_time: 0.002 })
+      });
+      const now = Math.floor(Date.now() / 1000);
+      const session = (email) => ({
+        id_token: "mock-id", refresh_token: "mock-refresh", token_type: "bearer",
+        next_action: null, next_operation: null,
+        token_info: { ttl: 900, exp: now + 900, iat: now, aud: "web", id: "mock" },
+        user_profile: {
+          id: "u1", email: email || "ada@lovelace.dev", username: null, phone: "+1 (415) 555-0134",
+          first_name: "Ada", last_name: "Lovelace", profile_photo: null, status: "active",
+          requires_password_change: false, email_verified_at: null, phone_verified_at: null,
+          created_at: null, modified_at: null, timezone: null, locale: null, metadata: null,
+          aud: "web", roles: []
+        }
+      });
+
+      switch (body.operation) {
+        case "auth.settings": return ok(settings);
+        case "auth.signin": {
+          const p = body.payload;
+          if (p.grant_type === "code" && p.code === "000000") return err("INVALID_TOKEN", 401);
+          if (p.grant_type !== "code" && (p.password || "").length < 8) return err("INVALID_CREDENTIALS", 401);
+          return ok(session(p.email));
+        }
+        case "auth.signup": return ok({ id: "u1", next_action: "SIGNIN", next_operation: "auth.signin" });
+        case "auth.request_code":
+          return ok({ accepted: true, purpose: body.payload.purpose, next_action: "SIGNIN_WITH_CODE", next_operation: "auth.signin" });
+        case "auth.confirm_code": {
+          if (body.payload.code === "000000") return err("INVALID_TOKEN", 401);
+          return ok(session(body.payload.email));
+        }
+        case "auth.change_password": return ok(session());
+        case "user.update": {
+          const s = session();
+          return ok({ ...s.user_profile, ...body.payload });
+        }
+        case "auth.signout": return ok({ signout: true });
+        case "auth.nonce": return ok({ nonce: "mock-nonce-0123456789abcdef0123456789abcdef" });
+        default: return err("NOT_IMPLEMENTED", 501, "SERVER_ERROR");
+      }
+    };
+  }
+
+  function wire(id, settings, overrides) {
+    // Each panel below demonstrates a different configuration, so each needs
+    // its own client. Clients are cached per connection identity, and the
+    // audience is part of that identity — so varying it by panel id is what
+    // keeps these five independent. A real page wants the opposite: one
+    // SinglebaseClient() shared by every widget (see spa.html).
+    const client = SinglebaseAuth({
+      baseUrl: "http://localhost", urlAccessKey: "demo", apiKey: "wk_demo",
+      audience: id, autoRefresh: false, crossTab: false,
+      fetch: mockFetch(settings), ...overrides
+    });
+    const el = document.getElementById(id);
+    el.client = client;
+    el.settings = settings;
+    return client;
+  }
+
+  wire("a", baseSettings());
+  wire("b", baseSettings());
+  wire("c", baseSettings());
+  wire("d", baseSettings());
+  wire("e", baseSettings());
+
+  document.getElementById("cfg-apply").addEventListener("click", () => {
+    const baseUrl = document.getElementById("cfg-baseUrl").value.trim();
+    const urlAccessKey = document.getElementById("cfg-urlAccessKey").value.trim();
+    const apiKey = document.getElementById("cfg-apiKey").value.trim();
+    if (!baseUrl || !urlAccessKey || !apiKey) return;
+    for (const id of ["a", "b", "c", "d", "e"]) {
+      const el = document.getElementById(id);
+      el.settings = null;
+      el.client = SinglebaseAuth({ baseUrl, urlAccessKey, apiKey, audience: id });
+    }
+  });
+</script>
+
+</body>
+</html>

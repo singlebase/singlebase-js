@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Singlebase SDK + multi-widget — local example</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #F4F4F3; font-family: 'Geist', -apple-system, sans-serif; color: #16181A;
+    padding: 40px; display: flex; flex-direction: column; gap: 24px;
+  }
+  h1 { font-size: 24px; font-weight: 600; letter-spacing: -0.02em; }
+  h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: #61666C;
+       font-family: 'Geist Mono', monospace; font-weight: 500; }
+  p.lede { font-size: 14px; line-height: 1.55; color: #41464B; max-width: 70ch; }
+  .row { display: flex; gap: 24px; flex-wrap: wrap; align-items: flex-start; }
+  .col { display: flex; flex-direction: column; gap: 10px; }
+  .w420 { width: 420px; }
+  .panel { background: #fff; border: 1px solid #E4E6E9; border-radius: 8px; padding: 16px;
+           display: flex; flex-direction: column; gap: 12px; }
+  .status { font-family: 'Geist Mono', monospace; font-size: 12px; line-height: 1.7; }
+  .status b { color: #0F6B4A; }
+  .status i { color: #B4231A; font-style: normal; }
+  button.act { font: inherit; font-size: 13px; padding: 7px 12px; cursor: pointer;
+               border: 1px solid #CDD1D6; background: #fff; border-radius: 4px; }
+  button.act:hover { background: #FAFAFA; }
+  .btns { display: flex; gap: 8px; flex-wrap: wrap; }
+  pre { font-family: 'Geist Mono', monospace; font-size: 11.5px; line-height: 1.6;
+        background: #16181A; color: #E6E8EA; padding: 12px; border-radius: 6px;
+        max-height: 320px; overflow: auto; white-space: pre-wrap; }
+  .who { display: flex; align-items: center; gap: 10px; font-size: 14px; }
+  .who singlebase-authui-display[avatar] { width: 34px; height: 34px; border-radius: 50%; }
+  .tag { font-family: 'Geist Mono', monospace; font-size: 10.5px; padding: 1px 5px;
+         border-radius: 3px; background: #EDEEEF; color: #41464B; }
+</style>
+</head>
+<body>
+
+<div>
+  <h1>SDK + multi-widget on one page</h1>
+  <p class="lede">
+    Two independent widgets, neither given a client — both resolve the same
+    <code>SinglebaseClient()</code>, so <code>sbc.auth</code> is one session, so signing in on one updates the other.
+    Tokens persist in IndexedDB encrypted with a non-extractable AES-GCM key.
+    Every event is logged below, and the service SDK calls share the auth client's HTTP pipe.
+  </p>
+</div>
+
+<div class="row">
+  <div class="col w420">
+    <h2>Widget A — no client attribute</h2>
+    <singlebase-authui id="a" no-account-view></singlebase-authui>
+  </div>
+
+  <div class="col w420">
+    <h2>Widget B — also unwired, same session</h2>
+    <singlebase-authui id="b" no-account-view></singlebase-authui>
+  </div>
+
+  <div class="col" style="width: 420px;">
+    <h2>App state &amp; SDK</h2>
+    <div class="panel">
+      <div class="who">
+        <singlebase-authui-display avatar></singlebase-authui-display>
+        <span>
+          Hello
+          <singlebase-authui-display path="first_name" fallback="there"></singlebase-authui-display>
+        </span>
+      </div>
+      <div class="status" id="status">booting…</div>
+      <div class="btns">
+        <button class="act" data-goto="signin">goto signin</button>
+        <button class="act" data-goto="signup">goto signup</button>
+        <button class="act" data-goto="forgot">goto forgot</button>
+        <button class="act" data-goto="my-account">goto my-account</button>
+      </div>
+      <div class="btns">
+        <button class="act" id="btn-data">sbc.data.query()</button>
+        <button class="act" id="btn-llm">sbc.llm.summarize()</button>
+        <button class="act" id="btn-dispatch">sbc.dispatch()</button>
+        <button class="act" id="btn-refresh">refreshSession()</button>
+        <button class="act" id="btn-logout">logout()</button>
+      </div>
+    </div>
+    <h2>Event log</h2>
+    <pre id="log"></pre>
+  </div>
+</div>
+
+<script type="module">
+  // The standalone bundle carries Lit, core, auth and the service SDK, so a
+  // plain file:// page needs no bundler and no import map.
+  import { SinglebaseClient } from "../packages/ui/dist/singlebase-authui.min.js";
+
+  const logEl = document.getElementById("log");
+  const statusEl = document.getElementById("status");
+  const line = (msg) => {
+    logEl.textContent += msg + "\n";
+    logEl.scrollTop = logEl.scrollHeight;
+  };
+
+  // ── mock backend ──────────────────────────────────────────
+  const SETTINGS = {
+    enabled: true,
+    auth_settings: {
+      enabled: true, allow_signin: true, allow_signup: true, identifier: ["email"],
+      signin_method: "password", second_factor: null, signup_verify_email: false,
+      account_update_verification: null,
+      password_policy: { NAME: "MEDIUM", LENGTH: [8, 64], SYMBOLS: false, NUMBERS: true, LOWERCASE: false, UPPERCASE: false }
+    },
+    oauth_settings: { enabled: true, allow_signin: true, allow_signup: true },
+    oauth_providers: {
+      google: { enabled: true, type: "client", name: "google", provider_name: "Google" },
+      github: { enabled: true, type: "client", name: "github", provider_name: "GitHub" }
+    }
+  };
+
+  const mockFetch = async (_url, init) => {
+    const body = JSON.parse(init.body);
+    const bearer = init.headers.Authorization ? "with-bearer" : "anon";
+    if (!body.operation.startsWith("auth.settings")) {
+      line(`→ ${body.operation.padEnd(22)} ${bearer}`);
+    }
+    const ok = (data) => ({ ok: true, json: async () => ({ data, meta: {}, exec_time: 0.002 }) });
+    const err = (message, status = 400) => ({
+      ok: true,
+      json: async () => ({ error: { type: "ERROR", status, message }, meta: {}, exec_time: 0.002 })
+    });
+    const now = Math.floor(Date.now() / 1000);
+    const session = (email) => ({
+      id_token: "id-" + Math.random().toString(36).slice(2, 8),
+      refresh_token: "refresh-" + Math.random().toString(36).slice(2, 8),
+      token_type: "bearer", next_action: null, next_operation: null,
+      token_info: { ttl: 900, exp: now + 900, iat: now, aud: "web", id: "t1" },
+      user_profile: {
+        id: "u1", email: email || "ada@lovelace.dev", username: null, phone: "+1 (415) 555-0134",
+        first_name: "Ada", last_name: "Lovelace", profile_photo: null, status: "active",
+        requires_password_change: false, email_verified_at: null, phone_verified_at: null,
+        created_at: null, modified_at: null, timezone: null, locale: null, metadata: null,
+        aud: "web", roles: []
+      }
+    });
+
+    switch (body.operation) {
+      case "auth.settings": return ok(SETTINGS);
+      case "auth.signin": {
+        const p = body.payload;
+        if (p.grant_type !== "code" && (p.password || "").length < 8) return err("INVALID_CREDENTIALS", 401);
+        return ok(session(p.email));
+      }
+      case "auth.refresh": return ok(session());
+      case "auth.signup": return ok({ id: "u1", next_action: "SIGNIN", next_operation: "auth.signin" });
+      case "auth.request_code":
+        return ok({ accepted: true, purpose: body.payload.purpose, next_action: "SIGNIN_WITH_CODE", next_operation: "auth.signin" });
+      case "auth.confirm_code": return ok(session(body.payload.email));
+      case "auth.signout": return ok({ signout: true });
+      case "user.update": return ok({ ...session().user_profile, ...body.payload });
+      case "data.query": return ok({ rows: [{ id: 1, title: "First note" }], count: 1 });
+      case "llm.summarize": return ok({ summary: "Ada builds things." });
+      case "data.insert": return ok({ id: "rec_1", created: true });
+      default: return ok({ echoed: body.operation });
+    }
+  };
+
+  // ── one instance for the whole page ───────────────────────
+  const sbc = SinglebaseClient({
+    baseUrl: "http://localhost",
+    urlAccessKey: "demo",
+    apiKey: "wk_demo",
+    fetch: mockFetch,
+    autoRefresh: { skewSeconds: 870, idleAfterMs: 60_000 }, // refresh ~30s in, for the demo
+    on: {
+      load: (state) => line(`⚡ load            ${state.status}`),
+      signin: () => line("⚡ signin"),
+      signout: () => line("⚡ signout"),
+      signup: () => line("⚡ signup"),
+      session: (s) => line(`⚡ session         ${s ? "replaced" : "cleared"}`),
+      "account-updated": () => line("⚡ account-updated"),
+      "password-change": () => line("⚡ password-change"),
+      "email-change": () => line("⚡ email-change"),
+      expired: (d) => line(`⚡ expired         ${d.reason}`),
+      error: (d) => line(`⚡ error           ${d.operation}: ${d.code}`)
+    }
+  });
+
+  // Widgets A and B are never given a client — they find this one.
+  const auth = sbc.auth;
+  window.auth = auth;
+  window.sbc = sbc;
+
+  // DOM events work too, for hosts that prefer listeners over callbacks.
+  document.addEventListener("singlebase-screen-change", (e) =>
+    line(`⚡ screen-change   ${e.target.id} → ${e.detail.screen}`)
+  );
+
+  function render() {
+    const user = auth.getUser();
+    statusEl.innerHTML = auth.isAuthenticated()
+      ? `<b>authenticated</b><br>user: ${user.first_name} ${user.last_name}<br>${user.email}<br>` +
+        `<span class="tag">storage: ${storageKind}</span>`
+      : `<i>signed out</i><br><span class="tag">storage: ${storageKind}</span>`;
+  }
+
+  let storageKind = "probing…";
+  auth.subscribe(render);
+  auth.ready.then(async () => {
+    const dbs = (await indexedDB.databases?.()) ?? [];
+    storageKind = dbs.some((d) => d.name === "singlebase-auth")
+      ? "indexeddb + cryptokey"
+      : "sessionStorage fallback";
+    render();
+  });
+  render();
+
+  // ── controls ──────────────────────────────────────────────
+  document.querySelectorAll("[data-goto]").forEach((btn) =>
+    btn.addEventListener("click", () => auth.goto(btn.dataset.goto))
+  );
+
+  const run = async (label, fn) => {
+    try {
+      const result = await fn();
+      line(`✓ ${label}: ${JSON.stringify(result)}`);
+    } catch (error) {
+      line(`✗ ${label}: ${error.code ?? error.message}`);
+    }
+  };
+
+  document.getElementById("btn-data").onclick = () =>
+    run("data.query", () => sbc.data.query({ limit: 10 }, { collection: "notes" }));
+  document.getElementById("btn-llm").onclick = () =>
+    run("llm.summarize", () => sbc.llm.summarize({ text: "Ada Lovelace wrote the first program." }));
+  document.getElementById("btn-dispatch").onclick = () =>
+    run("dispatch", () => sbc.dispatch({ operation: "data.insert", collection: "notes", payload: { body: "hi" } }));
+  document.getElementById("btn-refresh").onclick = () => run("refreshSession", () => auth.refreshSession());
+  document.getElementById("btn-logout").onclick = () => run("logout", () => auth.logout());
+</script>
+
+</body>
+</html>
