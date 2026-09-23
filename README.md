@@ -232,6 +232,23 @@ Open `examples/index.html` (the auth widget), `examples/customize.html`
 (the visual customizer), `examples/uploader.html` (the uploader) or
 `examples/spa.html` (the client in a single-page app). All run against mocks.
 
+## Publish
+
+You need to be logged in to npm (`npm login`) with access to the `@singlebase`
+organization, and have a clean, committed working tree.
+
+```bash
+pnpm verify                        # format check, build, test
+pnpm -r publish --dry-run          # see exactly what would ship
+pnpm -r publish --access public    # publish core, then the SDK, then elements
+```
+
+- **Use `pnpm`, never `npm publish`.** pnpm replaces the internal
+  `workspace:*` dependencies with real version numbers. npm doesn't, and the
+  published packages would fail to install.
+- **Versions move together.** Bump all three packages to the same version
+  before publishing, because each depends on the others' exact version.
+
 ## License
 
 MIT

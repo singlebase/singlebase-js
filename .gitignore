@@ -6,4 +6,4 @@ _trash/
 .history/
 coverage/
 *.log
-.claude
+.claude/
