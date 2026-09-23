@@ -15,28 +15,6 @@ importers:
         specifier: ^5.6.0
         version: 5.9.3
 
-  packages/auth:
-    dependencies:
-      '@singlebase/core':
-        specifier: workspace:*
-        version: link:../core
-    devDependencies:
-      '@types/jest':
-        specifier: ^29.5.12
-        version: 29.5.14
-      jest:
-        specifier: ^29.7.0
-        version: 29.7.0(@types/node@26.6.2)
-      ts-jest:
-        specifier: ^29.2.5
-        version: 29.4.12(@babel/core@7.29.7)(@jest/transform@29.7.0)(@jest/types@29.6.3)(babel-jest@29.7.0(@babel/core@7.29.7))(jest-util@29.7.0)(jest@29.7.0(@types/node@26.6.2))(typescript@5.9.3)
-      typescript:
-        specifier: ^5.6.0
-        version: 5.9.3
-      vite:
-        specifier: ^5.4.0
-        version: 5.4.21(@types/node@26.6.2)
-
   packages/core:
     devDependencies:
       '@types/jest':
@@ -55,42 +33,14 @@ importers:
         specifier: ^5.4.0
         version: 5.4.21(@types/node@26.6.2)
 
-  packages/sdk:
+  packages/singlebase-elements:
     dependencies:
-      '@singlebase/auth':
-        specifier: workspace:*
-        version: link:../auth
-      '@singlebase/core':
-        specifier: workspace:*
-        version: link:../core
-    devDependencies:
-      '@types/jest':
-        specifier: ^29.5.12
-        version: 29.5.14
-      jest:
-        specifier: ^29.7.0
-        version: 29.7.0(@types/node@26.6.2)
-      ts-jest:
-        specifier: ^29.2.5
-        version: 29.4.12(@babel/core@7.29.7)(@jest/transform@29.7.0)(@jest/types@29.6.3)(babel-jest@29.7.0(@babel/core@7.29.7))(jest-util@29.7.0)(jest@29.7.0(@types/node@26.6.2))(typescript@5.9.3)
-      typescript:
-        specifier: ^5.6.0
-        version: 5.9.3
-      vite:
-        specifier: ^5.4.0
-        version: 5.4.21(@types/node@26.6.2)
-
-  packages/ui:
-    dependencies:
-      '@singlebase/auth':
-        specifier: workspace:*
-        version: link:../auth
       '@singlebase/core':
         specifier: workspace:*
         version: link:../core
       '@singlebase/singlebase-sdk':
         specifier: workspace:*
-        version: link:../sdk
+        version: link:../singlebase-sdk
       lit:
         specifier: ^3.2.0
         version: 3.3.3
@@ -107,6 +57,28 @@ importers:
       '@web/test-runner':
         specifier: ^0.19.0
         version: 0.19.0
+      typescript:
+        specifier: ^5.6.0
+        version: 5.9.3
+      vite:
+        specifier: ^5.4.0
+        version: 5.4.21(@types/node@26.6.2)
+
+  packages/singlebase-sdk:
+    dependencies:
+      '@singlebase/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      '@types/jest':
+        specifier: ^29.5.12
+        version: 29.5.14
+      jest:
+        specifier: ^29.7.0
+        version: 29.7.0(@types/node@26.6.2)
+      ts-jest:
+        specifier: ^29.2.5
+        version: 29.4.12(@babel/core@7.29.7)(@jest/transform@29.7.0)(@jest/types@29.6.3)(babel-jest@29.7.0(@babel/core@7.29.7))(jest-util@29.7.0)(jest@29.7.0(@types/node@26.6.2))(typescript@5.9.3)
       typescript:
         specifier: ^5.6.0
         version: 5.9.3

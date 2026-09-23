@@ -1,3 +1,5 @@
+import type { AuthUIConfig } from "./authui-config.js";
+
 /**
  * Shared transport types. Service-agnostic: every Singlebase service speaks
  * this envelope, so these live in core rather than in any one domain package.
@@ -6,17 +8,27 @@
 export type Audience = string;
 
 export interface SinglebaseOptions {
-  baseUrl: string;
-  urlAccessKey: string;
+  /**
+   * The API root. Omit it to use `https://v1.singlebase.io/api`; it cannot be
+   * null or empty.
+   */
+  baseUrl?: string;
+  /** The project's URL access key. Optional; when set it is appended to `baseUrl`. */
+  urlAccessKey?: string;
   apiKey: string;
   audience?: Audience;
   fetch?: typeof globalThis.fetch;
+  /**
+   * Page-wide defaults for the singlebase-authui elements. Configuring them
+   * here means one call styles every widget; an attribute on an individual
+   * element still wins.
+   */
+  authui?: AuthUIConfig;
 }
 
 export interface RequestEnvelope<TPayload = unknown> {
   operation: string;
   payload: TPayload;
-  collection?: string;
   options?: Record<string, unknown>;
 }
 

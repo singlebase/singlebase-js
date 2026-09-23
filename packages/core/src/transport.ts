@@ -9,12 +9,40 @@ import type {
 export interface RequestExtras {
   token?: string | null;
   signal?: AbortSignal;
-  collection?: string;
   options?: Record<string, unknown>;
 }
 
 function isLocalHost(hostname: string): boolean {
   return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "0.0.0.0";
+}
+
+/** Where requests go when `baseUrl` is not given. */
+export const DEFAULT_BASE_URL = "https://v1.singlebase.io/api";
+
+/**
+ * The effective API root: the default when `baseUrl` is omitted. An explicit
+ * null or empty value is a configuration mistake, and is reported as one
+ * rather than silently replaced.
+ */
+export function resolveBaseUrl(options: Pick<SinglebaseOptions, "baseUrl">): string {
+  if (options.baseUrl === undefined) return DEFAULT_BASE_URL;
+  if (options.baseUrl === null || String(options.baseUrl).trim() === "") {
+    throw new Error(
+      `SinglebaseOptions.baseUrl cannot be null or empty. Omit it to use ${DEFAULT_BASE_URL}.`
+    );
+  }
+  return String(options.baseUrl).trim().replace(/\/+$/, "");
+}
+
+/**
+ * The URL every request is POSTed to: `{baseUrl}/{urlAccessKey}`, or just
+ * `{baseUrl}` when there is no access key.
+ */
+export function endpointFor(options: Pick<SinglebaseOptions, "baseUrl" | "urlAccessKey">): string {
+  const base = resolveBaseUrl(options);
+  assertSecureBaseUrl(base);
+  const key = options.urlAccessKey?.trim();
+  return key ? `${base}/${encodeURIComponent(key)}` : base;
 }
 
 /** Enforces the spec's HTTPS-outside-localhost rule for the configured baseUrl. */
@@ -43,10 +71,9 @@ export async function request<TData = unknown, TPayload = unknown>(
   payload: TPayload,
   extras: RequestExtras = {}
 ): Promise<TData> {
-  assertSecureBaseUrl(clientOptions.baseUrl);
+  const url = endpointFor(clientOptions);
 
   const envelope: RequestEnvelope<TPayload> = { operation, payload };
-  if (extras.collection) envelope.collection = extras.collection;
   if (extras.options) envelope.options = extras.options;
 
   const headers: Record<string, string> = {
@@ -58,7 +85,6 @@ export async function request<TData = unknown, TPayload = unknown>(
   }
 
   const fetchImpl = clientOptions.fetch ?? globalThis.fetch;
-  const url = `${clientOptions.baseUrl.replace(/\/+$/, "")}/api/${clientOptions.urlAccessKey}`;
 
   let res: Response;
   try {

@@ -1,4 +1,5 @@
 import type { SinglebaseOptions } from "./types.js";
+import { DEFAULT_BASE_URL } from "./transport.js";
 
 /**
  * Client registry.
@@ -34,9 +35,12 @@ function registry<T>(): Registry<T> {
 
 /** Connection identity — clients with the same one are the same instance. */
 export function clientKey(options: SinglebaseOptions): string {
-  return [options.baseUrl, options.urlAccessKey, options.apiKey, options.audience ?? "web"].join(
-    "|"
-  );
+  return [
+    options.baseUrl ?? DEFAULT_BASE_URL,
+    options.urlAccessKey ?? "",
+    options.apiKey,
+    options.audience ?? "web"
+  ].join("|");
 }
 
 /** Returns the cached client for these options, or creates and caches one. */

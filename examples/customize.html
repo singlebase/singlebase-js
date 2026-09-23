@@ -1,0 +1,722 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>singlebase-authui — customizer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --bg: #f4f4f3; --panel: #fff; --line: #e4e6e9; --ink: #16181a; --muted: #61666c;
+    --accent: #16181a; --mono: 'Geist Mono', ui-monospace, monospace;
+  }
+  body {
+    background: var(--bg); color: var(--ink);
+    font-family: 'Geist', -apple-system, 'Segoe UI', Helvetica, sans-serif;
+    font-size: 14px; line-height: 1.5;
+  }
+
+  header {
+    position: sticky; top: 0; z-index: 20;
+    display: flex; align-items: center; gap: 16px;
+    padding: 14px 24px; background: var(--panel); border-bottom: 1px solid var(--line);
+  }
+  header h1 { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
+  header .eyebrow {
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: .1em;
+    text-transform: uppercase; color: var(--muted);
+  }
+  header .spacer { flex: 1; }
+
+  button.act {
+    font: inherit; font-size: 13px; font-weight: 500; padding: 7px 13px; cursor: pointer;
+    border: 1px solid #cdd1d6; background: #fff; border-radius: 5px; color: var(--ink);
+  }
+  button.act:hover { background: #fafafa; }
+  button.act.primary { background: var(--ink); color: #fff; border-color: var(--ink); }
+  button.act.primary:hover { filter: brightness(1.15); }
+
+  .layout { display: grid; grid-template-columns: minmax(0,1fr) 420px; gap: 24px; padding: 24px; align-items: start; }
+  @media (max-width: 1100px) { .layout { grid-template-columns: 1fr; } }
+
+  .stage {
+    position: sticky; top: 74px; display: flex; flex-direction: column; gap: 16px;
+    /* The account screen is taller than the viewport, so the preview gets its
+       own scroll area rather than dragging the whole sticky column away. */
+    max-height: calc(100vh - 98px); overflow: auto; padding-right: 4px;
+  }
+  @media (max-width: 1100px) { .stage { position: static; max-height: none; overflow: visible; } }
+
+  /* view switcher */
+  .tabs { display: flex; gap: 2px; background: #f1f2f3; border-radius: 7px; padding: 3px; }
+  .tabs button {
+    font: inherit; font-size: 13px; font-weight: 500; padding: 5px 16px; cursor: pointer;
+    border: none; background: none; border-radius: 5px; color: var(--muted);
+  }
+  .tabs button[aria-pressed="true"] {
+    background: #fff; color: var(--ink);
+    box-shadow: 0 1px 2px rgba(0,0,0,.08);
+  }
+
+  .codeview { padding: 24px; max-width: 960px; margin: 0 auto; }
+  .codeview pre { max-height: calc(100vh - 240px); }
+  [hidden] { display: none !important; }
+  .preview-frame {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 28px;
+    display: flex; justify-content: center; min-height: 420px;
+  }
+  .preview-frame.dark { background: #0f1012; border-color: #2c2f34; }
+  .preview-inner { width: 100%; max-width: 420px; }
+  .preview-inner.wide { max-width: 680px; }
+
+  .screens { display: flex; flex-wrap: wrap; gap: 6px; }
+  .screens button {
+    font: inherit; font-family: var(--mono); font-size: 11px; padding: 4px 9px; cursor: pointer;
+    border: 1px solid var(--line); background: #fff; border-radius: 4px; color: var(--muted);
+  }
+  .screens button[aria-pressed="true"] { background: var(--ink); color: #fff; border-color: var(--ink); }
+
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .panel > h2 {
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--muted); padding: 12px 16px; border-bottom: 1px solid var(--line); font-weight: 500;
+  }
+
+  details { border-bottom: 1px solid var(--line); }
+  details:last-child { border-bottom: none; }
+  summary {
+    cursor: pointer; padding: 12px 16px; font-weight: 500; font-size: 13.5px;
+    display: flex; align-items: center; gap: 8px; list-style: none;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::before { content: "›"; font-family: var(--mono); color: var(--muted); transition: transform .2s; }
+  details[open] > summary::before { transform: rotate(90deg); }
+  summary .count {
+    margin-left: auto; font-family: var(--mono); font-size: 10.5px; color: var(--muted);
+    background: #f1f2f3; border-radius: 10px; padding: 1px 7px;
+  }
+  .fields { padding: 4px 16px 16px; display: flex; flex-direction: column; gap: 12px; }
+
+  .row { display: grid; grid-template-columns: 130px 1fr; gap: 10px; align-items: center; }
+  .row > label { font-size: 12.5px; color: var(--muted); }
+  .row input[type="text"], .row input[type="url"], .row select {
+    font: inherit; font-size: 13px; width: 100%; padding: 6px 9px;
+    border: 1px solid var(--line); border-radius: 4px; background: #fff; color: var(--ink);
+  }
+  .row .combo { display: flex; gap: 6px; align-items: center; }
+  .row input[type="color"] {
+    width: 34px; height: 30px; padding: 0; border: 1px solid var(--line);
+    border-radius: 4px; background: #fff; cursor: pointer; flex: 0 0 auto;
+  }
+  .row input.changed, .row select.changed { border-color: #2f5bea; background: #f5f8ff; }
+  .row .reset-one {
+    font: inherit; font-size: 15px; line-height: 1; border: none; background: none; cursor: pointer;
+    color: var(--muted); padding: 0 4px; visibility: hidden;
+  }
+  .row.is-changed .reset-one { visibility: visible; }
+
+  .switch-row { display: flex; align-items: center; gap: 10px; }
+  .switch-row label { font-size: 13px; flex: 1; }
+
+  .msg-tools { display: flex; gap: 8px; align-items: center; padding: 0 16px 12px; }
+  .msg-tools input { flex: 1; font: inherit; font-size: 13px; padding: 6px 9px; border: 1px solid var(--line); border-radius: 4px; }
+  .msg-list { max-height: 360px; overflow: auto; padding: 0 16px 16px; display: flex; flex-direction: column; gap: 10px; }
+  .msg-row { display: flex; flex-direction: column; gap: 3px; }
+  .msg-row code { font-family: var(--mono); font-size: 10.5px; color: var(--muted); }
+  .msg-row input { font: inherit; font-size: 13px; padding: 6px 9px; border: 1px solid var(--line); border-radius: 4px; }
+  .msg-row input.changed { border-color: #2f5bea; background: #f5f8ff; }
+
+  .code-head { display: flex; align-items: center; gap: 6px; padding: 10px 16px; border-bottom: 1px solid var(--line); }
+  .code-head button {
+    font: inherit; font-family: var(--mono); font-size: 11px; padding: 4px 10px; cursor: pointer;
+    border: 1px solid transparent; background: none; border-radius: 4px; color: var(--muted);
+  }
+  .code-head button[aria-pressed="true"] { background: #f1f2f3; color: var(--ink); }
+  .code-head .spacer { flex: 1; }
+  pre {
+    font-family: var(--mono); font-size: 11.5px; line-height: 1.65; padding: 16px;
+    background: #16181a; color: #e6e8ea; overflow: auto; max-height: 420px; white-space: pre;
+  }
+  .hint { font-size: 12px; color: var(--muted); padding: 10px 16px; border-top: 1px solid var(--line); }
+  .hint code { font-family: var(--mono); font-size: 11px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="eyebrow">singlebase-authui</div>
+    <h1>Customizer</h1>
+  </div>
+  <nav class="tabs" id="views">
+    <button data-view="edit" aria-pressed="true">Edit</button>
+    <button data-view="code" aria-pressed="false">Code</button>
+  </nav>
+  <div class="spacer"></div>
+  <button class="act" id="btn-reset">Reset all</button>
+  <button class="act primary" id="btn-copy">Copy code</button>
+</header>
+
+<div class="layout" id="view-edit">
+  <!-- ── live preview ─────────────────────────────────────── -->
+  <div class="stage">
+    <div class="screens" id="screens"></div>
+    <div class="preview-frame" id="frame">
+      <div class="preview-inner" id="inner">
+        <singlebase-authui id="widget"></singlebase-authui>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── controls ─────────────────────────────────────────── -->
+  <div class="panel" id="controls">
+    <h2>Options</h2>
+  </div>
+</div>
+
+<!-- ── code view ──────────────────────────────────────────── -->
+<div class="codeview" id="view-code" hidden>
+  <div class="panel">
+    <div class="code-head">
+      <button data-tab="html" aria-pressed="true">HTML</button>
+      <button data-tab="js" aria-pressed="false">JavaScript</button>
+      <button data-tab="json" aria-pressed="false">JSON</button>
+      <div class="spacer"></div>
+      <button id="btn-copy-2">copy</button>
+    </div>
+    <pre id="code">…</pre>
+    <p class="hint" id="code-hint"></p>
+  </div>
+</div>
+
+<script type="module">
+import { SinglebaseAuth, defaultMessages, TOKEN_DEFAULTS }
+  from "../packages/singlebase-elements/dist/singlebase-elements.min.js";
+
+// ── the option schema ────────────────────────────────────────
+// Controls and generated code both come from this one list, so a new
+// attribute on the element only has to be described once.
+const ATTRS = [
+  { g: "Layout & branding", a: "layout", t: "select", opts: ["card", "split"], def: "card" },
+  { g: "Layout & branding", a: "oauth-placement", t: "select", opts: ["bottom", "top"], def: "bottom" },
+  { g: "Layout & branding", a: "stepped", t: "bool", def: false },
+  { g: "Layout & branding", a: "logo-url", t: "url", def: "", ph: "https://…/logo.svg" },
+  { g: "Layout & branding", a: "logo-text", t: "text", def: "", ph: "ACME" },
+  { g: "Layout & branding", a: "brand-line", t: "text", def: "", ph: "One account for everything." },
+  { g: "Layout & branding", a: "brand-foot", t: "text", def: "", ph: "Secured by Singlebase" },
+  { g: "Layout & branding", a: "sign-in-title", t: "text", def: "", ph: "Welcome back" },
+  { g: "Layout & branding", a: "branding", t: "flag", def: true },
+
+  { g: "Screens & behaviour", a: "initial-screen", t: "select", def: "signin",
+    opts: ["signin", "signup", "forgot", "verify", "newpass", "otp", "invite", "account"] },
+  { g: "Screens & behaviour", a: "no-account-view", t: "bool", def: false },
+  { g: "Screens & behaviour", a: "redirect-url", t: "text", def: "", ph: "/dashboard" },
+  { g: "Screens & behaviour", a: "tos-url", t: "text", def: "", ph: "/terms" },
+  { g: "Screens & behaviour", a: "privacy-url", t: "text", def: "", ph: "/privacy" },
+  { g: "Screens & behaviour", a: "nonce-storage-key", t: "text", def: "singlebase-oauth-nonce" },
+
+  { g: "Sign-in methods", a: "auth-enabled", t: "flag", def: true },
+  { g: "Sign-in methods", a: "allow-email-signin", t: "flag", def: true },
+  { g: "Sign-in methods", a: "allow-email-signup", t: "flag", def: true },
+  { g: "Sign-in methods", a: "allow-email-otp", t: "flag", def: true },
+  { g: "Sign-in methods", a: "allow-oauth", t: "flag", def: true },
+  { g: "Sign-in methods", a: "allow-account-creation", t: "flag", def: true },
+
+  { g: "Appearance", a: "theme", t: "select", opts: ["", "light", "dark"], def: "" },
+  { g: "Appearance", a: "density", t: "select", opts: ["", "comfortable", "compact"], def: "" },
+  { g: "Appearance", a: "field-style", t: "select", opts: ["", "outline", "underline"], def: "" },
+
+  { g: "Invite prefill", a: "invite-email", t: "text", def: "", ph: "ada@acme.com" },
+  { g: "Invite prefill", a: "invite-org", t: "text", def: "", ph: "Acme" },
+  { g: "Invite prefill", a: "invite-code", t: "text", def: "", ph: "123456" }
+];
+
+// baseUrl and urlAccessKey are optional: the SDK defaults the base URL to
+// https://v1.singlebase.io/api, so they are only emitted when you set them.
+const CONNECTION = [
+  { k: "baseUrl", def: "", ph: "https://v1.singlebase.io/api (default)", optional: true },
+  { k: "urlAccessKey", def: "", ph: "your-url-access-key (optional)", optional: true },
+  { k: "apiKey", def: "", ph: "wk_…" }
+];
+
+// camelCase token name -> the --sb-* custom property it drives
+const cssVar = (k) => "--sb-" + k.replace(/[A-Z]/g, (c) => "-" + c.toLowerCase());
+const TOKENS = Object.entries(TOKEN_DEFAULTS).map(([k, v]) => ({
+  k, v, css: cssVar(k),
+  kind: /^#/.test(v) ? "color" : /\d/.test(v) ? "size" : "font"
+}));
+
+const SCREENS = ["signin", "signup", "forgot", "verify", "newpass", "otp", "invite", "account"];
+
+// ── state ────────────────────────────────────────────────────
+const STORE = "singlebase-authui:customizer";
+const blank = () => ({ attrs: {}, tokens: {}, messages: {}, connection: {}, screen: "signin" });
+let state = blank();
+try {
+  const saved = localStorage.getItem(STORE);
+  if (saved) state = { ...blank(), ...JSON.parse(saved) };
+} catch { /* ignore a corrupt or blocked store */ }
+
+const save = () => {
+  try { localStorage.setItem(STORE, JSON.stringify(state)); } catch { /* private mode */ }
+};
+
+// ── a mock backend, so the preview works with no project ─────
+const SETTINGS = {
+  enabled: true,
+  auth_settings: {
+    enabled: true, allow_signin: true, allow_signup: true, identifier: ["email"],
+    signin_method: "password", second_factor: null, signup_verify_email: false,
+    account_update_verification: null,
+    password_policy: { NAME: "MEDIUM", LENGTH: [8, 64], SYMBOLS: false, NUMBERS: true, LOWERCASE: false, UPPERCASE: false }
+  },
+  oauth_settings: { enabled: true, allow_signin: true, allow_signup: true },
+  oauth_providers: {
+    google: { enabled: true, type: "client", name: "google", provider_name: "Google" },
+    github: { enabled: true, type: "client", name: "github", provider_name: "GitHub" },
+    linkedin: { enabled: true, type: "client", name: "linkedin", provider_name: "LinkedIn" }
+  }
+};
+
+const now = () => Math.floor(Date.now() / 1000);
+const demoSession = (email) => ({
+  id_token: "preview", refresh_token: "preview", token_type: "bearer",
+  next_action: null, next_operation: null,
+  token_info: { ttl: 900, exp: now() + 900, iat: now(), aud: "web", id: "p" },
+  user_profile: {
+    id: "u1", email: email || "ada@lovelace.dev", username: null, phone: "+1 (415) 555-0134",
+    first_name: "Ada", last_name: "Lovelace", profile_photo: null, status: "active",
+    requires_password_change: false, email_verified_at: null, phone_verified_at: null,
+    created_at: null, modified_at: null, timezone: null, locale: null, metadata: null,
+    aud: "web", roles: []
+  }
+});
+
+const mockFetch = async (_url, init) => {
+  const body = JSON.parse(init.body);
+  const ok = (data) => ({ ok: true, json: async () => ({ data, meta: {}, exec_time: 0.001 }) });
+  switch (body.operation) {
+    case "auth.settings": return ok(SETTINGS);
+    case "auth.signin": return ok(demoSession(body.payload.email));
+    case "auth.refresh": return ok(demoSession());
+    case "auth.signup": return ok({ id: "u1", next_action: "SIGNIN", next_operation: "auth.signin" });
+    case "auth.request_code":
+      return ok({ accepted: true, purpose: body.payload.purpose, next_action: "SIGNIN_WITH_CODE", next_operation: "auth.signin" });
+    case "auth.confirm_code": return ok(demoSession(body.payload.email));
+    case "auth.signout": return ok({ signout: true });
+    default: return ok({});
+  }
+};
+
+const auth = SinglebaseAuth({
+  baseUrl: "http://localhost", urlAccessKey: "preview", apiKey: "wk_preview",
+  fetch: mockFetch,
+  auth: { autoRefresh: false, crossTab: false }
+});
+
+// ── rendering the preview ────────────────────────────────────
+const widget = document.getElementById("widget");
+const frame = document.getElementById("frame");
+const inner = document.getElementById("inner");
+widget.client = auth;
+widget.settings = SETTINGS;
+
+function applyPreview() {
+  for (const { a, t, def } of ATTRS) {
+    const v = state.attrs[a];
+    if (v === undefined || v === "" || v === def) { widget.removeAttribute(a); continue; }
+    if (t === "bool") { v ? widget.setAttribute(a, "") : widget.removeAttribute(a); continue; }
+    if (t === "flag") { v === false ? widget.setAttribute(a, "false") : widget.removeAttribute(a); continue; }
+    widget.setAttribute(a, v);
+  }
+
+  widget.style.cssText = "";
+  for (const { css } of TOKENS) {
+    const v = state.tokens[css];
+    if (v) widget.style.setProperty(css, v);
+  }
+
+  widget.messages = { ...state.messages };
+
+  // account needs a session; the other screens need none.
+  const wantsAccount = state.screen === "account";
+  if (wantsAccount && !auth.isAuthenticated()) {
+    auth.signIn({ email: "ada@lovelace.dev", password: "preview-password" });
+  } else if (!wantsAccount && auth.isAuthenticated()) {
+    auth.logout();
+  }
+  widget.screen = state.screen;
+
+  frame.classList.toggle("dark", state.attrs.theme === "dark");
+  inner.classList.toggle("wide", state.attrs.layout === "split");
+}
+
+// ── code generation ──────────────────────────────────────────
+const attrChanges = () =>
+  ATTRS.filter(({ a, def }) => state.attrs[a] !== undefined && state.attrs[a] !== "" && state.attrs[a] !== def);
+const tokenChanges = () => TOKENS.filter(({ css }) => state.tokens[css]);
+const messageChanges = () => Object.entries(state.messages).filter(([, v]) => v !== "");
+
+function attrMarkup(indent = "  ") {
+  return attrChanges().map(({ a, t }) => {
+    const v = state.attrs[a];
+    if (t === "bool") return `${indent}${a}`;
+    if (t === "flag") return `${indent}${a}="false"`;
+    return `${indent}${a}="${String(v).replace(/"/g, "&quot;")}"`;
+  });
+}
+
+function genHtml() {
+  const out = [];
+  const tokens = tokenChanges();
+
+  if (tokens.length) {
+    out.push("<style>", "  singlebase-authui {");
+    for (const { css } of tokens) out.push(`    ${css}: ${state.tokens[css]};`);
+    out.push("  }", "</style>", "");
+  }
+
+  const attrs = attrMarkup();
+  out.push(attrs.length ? `<singlebase-authui\n${attrs.join("\n")}\n></singlebase-authui>`
+                        : "<singlebase-authui></singlebase-authui>");
+
+  const msgs = messageChanges();
+  if (msgs.length) {
+    out.push("", "<!-- message overrides are objects, so use the JavaScript tab -->");
+  }
+  return out.join("\n");
+}
+
+// kebab attribute -> camelCase AuthUIConfig key
+const configKey = (a) => a.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+
+/** The `authui` block of SinglebaseClient's options. */
+function authUIConfig() {
+  const cfg = {};
+  for (const { a, t } of attrChanges()) {
+    const v = state.attrs[a];
+    cfg[configKey(a)] = t === "bool" || t === "flag" ? Boolean(v) : v;
+  }
+
+  const tokens = tokenChanges();
+  if (tokens.length) {
+    cfg.tokens = {};
+    for (const { css } of tokens) cfg.tokens[css] = state.tokens[css];
+  }
+
+  const msgs = messageChanges();
+  if (msgs.length) {
+    cfg.messages = Object.fromEntries(msgs);
+  }
+  return cfg;
+}
+
+function clientOptions() {
+  const opts = {};
+  for (const { k, def, optional } of CONNECTION) {
+    const value = state.connection[k] || def;
+    if (value) opts[k] = value;
+    else if (!optional) opts[k] = `YOUR_${k.replace(/([A-Z])/g, "_$1").toUpperCase()}`;
+  }
+  const cfg = authUIConfig();
+  if (Object.keys(cfg).length) opts.authui = cfg;
+  return opts;
+}
+
+function genJs() {
+  const opts = clientOptions();
+  const body = JSON.stringify(opts, null, 2)
+    .split("\n")
+    .map((line, i) => (i === 0 ? line : "  " + line))
+    .join("\n");
+
+  return [
+    `import { SinglebaseClient } from "@singlebase/singlebase-sdk";`,
+    `import "@singlebase/elements";`,
+    "",
+    "// One call configures every singlebase-authui element on the page.",
+    `SinglebaseClient(${body});`,
+    "",
+    "// The tag needs no attributes — it picks the config up from the client.",
+    "// <singlebase-authui></singlebase-authui>"
+  ].join("\n");
+}
+
+function genJson() {
+  return JSON.stringify(clientOptions(), null, 2);
+}
+
+let tab = "html";
+let view = "edit";
+const codeEl = document.getElementById("code");
+const hintEl = document.getElementById("code-hint");
+
+function renderCode() {
+  codeEl.textContent = tab === "html" ? genHtml() : tab === "js" ? genJs() : genJson();
+  const n = attrChanges().length + tokenChanges().length + messageChanges().length;
+  hintEl.innerHTML = n === 0
+    ? "Nothing customised yet — every option is at its default."
+    : `<b>${n}</b> option${n === 1 ? "" : "s"} changed. Only these are emitted; everything else keeps its default.`;
+}
+
+// ── control rendering ────────────────────────────────────────
+const controls = document.getElementById("controls");
+const el = (tag, attrs = {}, kids = []) => {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "class") n.className = v;
+    else if (k.startsWith("on")) n.addEventListener(k.slice(2), v);
+    else if (v !== null && v !== undefined) n.setAttribute(k, v);
+  }
+  for (const kid of [].concat(kids)) n.append(kid);
+  return n;
+};
+
+function group(title, countFn, body) {
+  const d = el("details", {}, [el("summary", {}, [title, el("span", { class: "count" })])]);
+  d.append(body);
+  d.refreshCount = () => {
+    const n = countFn();
+    d.querySelector(".count").textContent = n ? `${n} changed` : "";
+  };
+  return d;
+}
+
+function update() {
+  applyPreview();
+  if (view === "code") renderCode();
+  save();
+  controls.querySelectorAll("details").forEach((d) => d.refreshCount?.());
+}
+
+function fieldRow(label, input, isChanged, onReset) {
+  const reset = el("button", { class: "reset-one", title: "Reset", onclick: onReset }, ["×"]);
+  const row = el("div", { class: "row" }, [el("label", {}, [label]), el("div", { class: "combo" }, [input, reset])]);
+  row.sync = () => {
+    const changed = isChanged();
+    row.classList.toggle("is-changed", changed);
+    input.classList.toggle("changed", changed);
+  };
+  row.sync();
+  return row;
+}
+
+const rows = [];
+
+// Options grouped by the schema's `g`
+for (const g of [...new Set(ATTRS.map((x) => x.g))]) {
+  const items = ATTRS.filter((x) => x.g === g);
+  const box = el("div", { class: "fields" });
+
+  for (const item of items) {
+    const { a, t, def, opts, ph } = item;
+    const cur = state.attrs[a] ?? def;
+    let input;
+
+    if (t === "select") {
+      input = el("select", { onchange: (e) => { state.attrs[a] = e.target.value; update(); row.sync(); } });
+      for (const o of opts) input.append(el("option", { value: o, ...(o === cur ? { selected: "" } : {}) }, [o || "(default)"]));
+    } else if (t === "bool" || t === "flag") {
+      input = el("input", { type: "checkbox", ...(cur ? { checked: "" } : {}) });
+      input.checked = !!cur;
+      input.addEventListener("change", (e) => { state.attrs[a] = e.target.checked; update(); row.sync(); });
+    } else {
+      input = el("input", { type: "text", value: cur ?? "", placeholder: ph ?? String(def ?? "") });
+      input.addEventListener("input", (e) => { state.attrs[a] = e.target.value; update(); row.sync(); });
+    }
+
+    const row = fieldRow(a, input, () => {
+      const v = state.attrs[a];
+      return v !== undefined && v !== "" && v !== def;
+    }, () => {
+      delete state.attrs[a];
+      if (t === "bool" || t === "flag") input.checked = !!def;
+      else if (t === "select") input.value = def;
+      else input.value = "";
+      update(); row.sync();
+    });
+    rows.push(row);
+    box.append(row);
+  }
+
+  controls.append(group(g, () => items.filter(({ a, def }) =>
+    state.attrs[a] !== undefined && state.attrs[a] !== "" && state.attrs[a] !== def).length, box));
+}
+
+// Colours and sizes, built from the library's own TOKEN_DEFAULTS
+for (const kind of ["color", "size", "font"]) {
+  const items = TOKENS.filter((t) => t.kind === kind);
+  if (!items.length) continue;
+  const box = el("div", { class: "fields" });
+
+  for (const { css, v } of items) {
+    const cur = state.tokens[css] || v;
+    let input;
+
+    if (kind === "color") {
+      const swatch = el("input", { type: "color", value: /^#[0-9a-f]{6}$/i.test(cur) ? cur : "#000000" });
+      const text = el("input", { type: "text", value: state.tokens[css] || "", placeholder: v });
+      const set = (val) => { state.tokens[css] = val; text.value = val; if (/^#[0-9a-f]{6}$/i.test(val)) swatch.value = val; update(); row.sync(); };
+      swatch.addEventListener("input", (e) => set(e.target.value));
+      text.addEventListener("input", (e) => { state.tokens[css] = e.target.value; update(); row.sync(); });
+      input = el("span", { class: "combo" }, [swatch, text]);
+      input.classList = { toggle: () => {} };
+      var syncTarget = text;
+    } else {
+      input = el("input", { type: "text", value: state.tokens[css] || "", placeholder: v });
+      input.addEventListener("input", (e) => { state.tokens[css] = e.target.value; update(); row.sync(); });
+      var syncTarget = input;
+    }
+
+    const row = fieldRow(css.replace("--sb-", ""), input, () => !!state.tokens[css], () => {
+      delete state.tokens[css];
+      syncTarget.value = "";
+      update(); row.sync();
+    });
+    // the colour case wraps two inputs, so point the highlight at the text one
+    const target = syncTarget;
+    row.sync = () => {
+      const changed = !!state.tokens[css];
+      row.classList.toggle("is-changed", changed);
+      target.classList.toggle("changed", changed);
+    };
+    row.sync();
+    box.append(row);
+  }
+
+  const label = kind === "color" ? "Colours" : kind === "size" ? "Sizes & spacing" : "Fonts";
+  controls.append(group(label, () => items.filter(({ css }) => state.tokens[css]).length, box));
+}
+
+// Language — every message key, searchable, only overrides are exported
+{
+  const box = el("div", {});
+  const search = el("input", { type: "text", placeholder: "Search message keys…" });
+  const onlyChanged = el("input", { type: "checkbox" });
+  box.append(el("div", { class: "msg-tools" }, [
+    search,
+    el("label", { style: "font-size:12px;color:var(--muted);display:flex;gap:5px;align-items:center" }, [onlyChanged, "changed"])
+  ]));
+
+  const list = el("div", { class: "msg-list" });
+  box.append(list);
+
+  const entries = Object.entries(defaultMessages);
+  function paint() {
+    const q = search.value.trim().toLowerCase();
+    list.textContent = "";
+    for (const [k, v] of entries) {
+      if (onlyChanged.checked && !state.messages[k]) continue;
+      if (q && !k.toLowerCase().includes(q) && !String(v).toLowerCase().includes(q)) continue;
+      const input = el("input", { type: "text", value: state.messages[k] || "", placeholder: String(v) });
+      if (state.messages[k]) input.classList.add("changed");
+      input.addEventListener("input", (e) => {
+        const val = e.target.value;
+        if (val) state.messages[k] = val; else delete state.messages[k];
+        input.classList.toggle("changed", !!val);
+        update();
+      });
+      list.append(el("div", { class: "msg-row" }, [el("code", {}, [k]), input]));
+    }
+    if (!list.children.length) list.append(el("p", { style: "font-size:12.5px;color:var(--muted)" }, ["No matching keys."]));
+  }
+  search.addEventListener("input", paint);
+  onlyChanged.addEventListener("change", paint);
+  paint();
+
+  controls.append(group("Language & messages", () => Object.keys(state.messages).length, box));
+}
+
+// Connection — only used by the generated code, never by the preview
+{
+  const box = el("div", { class: "fields" });
+  for (const { k, def, ph } of CONNECTION) {
+    const input = el("input", { type: "text", value: state.connection[k] || "", placeholder: ph || def });
+    input.addEventListener("input", (e) => { state.connection[k] = e.target.value; update(); row.sync(); });
+    const row = fieldRow(k, input, () => !!state.connection[k], () => {
+      delete state.connection[k]; input.value = ""; update(); row.sync();
+    });
+    box.append(row);
+  }
+  box.append(el("p", { class: "hint", style: "padding:6px 0 0;border:none" }, [
+    "Only the wk_ web key belongs in browser code. The preview never uses these."
+  ]));
+  controls.append(group("Connection", () => Object.keys(state.connection).filter((k) => state.connection[k]).length, box));
+}
+
+// ── screen switcher ──────────────────────────────────────────
+const screensEl = document.getElementById("screens");
+for (const s of SCREENS) {
+  const b = el("button", { "aria-pressed": String(s === state.screen), onclick: () => {
+    state.screen = s;
+    screensEl.querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(x.textContent === s)));
+    update();
+  } }, [s]);
+  screensEl.append(b);
+}
+
+// ── view switching ───────────────────────────────────────────
+const viewEdit = document.getElementById("view-edit");
+const viewCode = document.getElementById("view-code");
+
+function showView(next) {
+  view = next;
+  viewEdit.hidden = next !== "edit";
+  viewCode.hidden = next !== "code";
+  document.querySelectorAll("#views button").forEach((b) =>
+    b.setAttribute("aria-pressed", String(b.dataset.view === next))
+  );
+  if (next === "code") renderCode();
+}
+
+document.querySelectorAll("#views button").forEach((b) =>
+  b.addEventListener("click", () => showView(b.dataset.view))
+);
+
+// ── code tabs, copy, reset ───────────────────────────────────
+document.querySelectorAll(".code-head [data-tab]").forEach((b) => {
+  b.addEventListener("click", () => {
+    tab = b.dataset.tab;
+    document.querySelectorAll(".code-head [data-tab]").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+    renderCode();
+  });
+});
+
+const copy = async (btn) => {
+  try {
+    await navigator.clipboard.writeText(codeEl.textContent);
+    const was = btn.textContent;
+    btn.textContent = "copied";
+    setTimeout(() => (btn.textContent = was), 1200);
+  } catch {
+    // Clipboard can be blocked; select the text so ⌘C still works.
+    const r = document.createRange();
+    r.selectNodeContents(codeEl);
+    getSelection().removeAllRanges();
+    getSelection().addRange(r);
+  }
+};
+document.getElementById("btn-copy").addEventListener("click", (e) => {
+  // Show what is being copied rather than copying something off-screen.
+  if (view !== "code") showView("code");
+  copy(e.currentTarget);
+});
+document.getElementById("btn-copy-2").addEventListener("click", (e) => copy(e.currentTarget));
+
+document.getElementById("btn-reset").addEventListener("click", () => {
+  if (!confirm("Reset every option back to its default?")) return;
+  state = blank();
+  save();
+  location.reload();
+});
+
+await auth.ready;
+update();
+</script>
+
+</body>
+</html>

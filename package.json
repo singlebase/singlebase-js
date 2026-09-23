@@ -1,19 +1,18 @@
 {
-  "name": "singlebase-authui",
+  "name": "singlebase-js",
   "private": true,
   "type": "module",
   "scripts": {
     "build": "pnpm -r run build",
     "test": "pnpm -r run test",
     "test:core": "pnpm --filter @singlebase/core run test",
-    "test:auth": "pnpm --filter @singlebase/auth run test",
     "test:sdk": "pnpm --filter @singlebase/singlebase-sdk run test",
-    "test:ui": "pnpm --filter @singlebase/singlebase-authui run test",
     "typecheck": "pnpm -r exec tsc -p tsconfig.json --noEmit",
     "format": "prettier --write \"packages/*/src/**/*.ts\" \"packages/*/test/**/*.ts\"",
     "format:check": "prettier --check \"packages/*/src/**/*.ts\" \"packages/*/test/**/*.ts\"",
     "verify": "pnpm run format:check && pnpm run build && pnpm run test",
-    "example": "pnpm build && python3 -m http.server 4517"
+    "example": "pnpm build && python3 -m http.server 4517",
+    "test:elements": "pnpm --filter @singlebase/elements run test"
   },
   "devDependencies": {
     "prettier": "^3.3.3",

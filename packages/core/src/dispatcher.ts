@@ -8,7 +8,6 @@ const RETRYABLE_AUTH_CODES = new Set(["INVALID_ID_TOKEN", "INVALID_BEARER_TOKEN"
 export interface DispatchEnvelope<TPayload = unknown> {
   operation: string;
   payload?: TPayload;
-  collection?: string;
   options?: Record<string, unknown>;
 }
 
@@ -80,12 +79,7 @@ export class RpcDispatcher {
     const bridge = explicit ? null : await this.resolveBridge();
     const token = explicit ? bearer : (bridge?.getToken() ?? null);
 
-    const extras = {
-      token,
-      signal,
-      collection: envelope.collection,
-      options: envelope.options
-    };
+    const extras = { token, signal, options: envelope.options };
 
     try {
       return await request<TResult, TPayload>(

@@ -1,5 +1,5 @@
 import { jest } from "@jest/globals";
-import { request, assertSecureBaseUrl } from "../src/transport.js";
+import { request, assertSecureBaseUrl, endpointFor, DEFAULT_BASE_URL } from "../src/transport.js";
 import { SinglebaseAuthError } from "../src/errors.js";
 import type { AuthClientOptions } from "../src/types.js";
 
@@ -42,7 +42,7 @@ describe("request", () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = (fetchMock as jest.Mock).mock.calls[0];
-    expect(url).toBe("https://api.example.com/api/abc123");
+    expect(url).toBe("https://api.example.com/abc123");
     expect(init.method).toBe("POST");
     expect(init.headers["Content-Type"]).toBe("application/json");
     expect(init.headers["X-API-Key"]).toBe("wk_test");
@@ -89,5 +89,81 @@ describe("request", () => {
     await expect(
       request({ ...baseOptions, fetch: fetchMock }, "auth.settings", {})
     ).rejects.toThrow(SinglebaseAuthError);
+  });
+});
+
+describe("envelope shape", () => {
+  it("sends operation and payload, and nothing else, when there are no options", async () => {
+    const fetchMock = jest.fn(async (_url: unknown, init: any) => ({
+      ok: true,
+      json: async () => ({ data: {}, meta: {}, exec_time: 0 })
+    })) as unknown as typeof fetch;
+
+    await request(
+      { baseUrl: "https://api.example.com", urlAccessKey: "k", apiKey: "wk_x", fetch: fetchMock },
+      "data.query",
+      { limit: 5 }
+    );
+
+    const body = JSON.parse((fetchMock as unknown as jest.Mock).mock.calls[0][1].body);
+    expect(Object.keys(body).sort()).toEqual(["operation", "payload"]);
+  });
+
+  it("carries options as the third and only other envelope key", async () => {
+    const fetchMock = jest.fn(async () => ({
+      ok: true,
+      json: async () => ({ data: {}, meta: {}, exec_time: 0 })
+    })) as unknown as typeof fetch;
+
+    await request(
+      { baseUrl: "https://api.example.com", urlAccessKey: "k", apiKey: "wk_x", fetch: fetchMock },
+      "data.query",
+      { limit: 5 },
+      { options: { collection: "notes" } }
+    );
+
+    const body = JSON.parse((fetchMock as unknown as jest.Mock).mock.calls[0][1].body);
+    expect(Object.keys(body).sort()).toEqual(["operation", "options", "payload"]);
+    expect(body.options).toEqual({ collection: "notes" });
+  });
+});
+
+describe("endpoint", () => {
+  const base = { apiKey: "wk_x" };
+
+  it("defaults to https://v1.singlebase.io/api", () => {
+    expect(endpointFor(base)).toBe("https://v1.singlebase.io/api");
+    expect(DEFAULT_BASE_URL).toBe("https://v1.singlebase.io/api");
+  });
+
+  it("appends the access key when there is one", () => {
+    expect(endpointFor({ ...base, urlAccessKey: "proj" })).toBe(
+      "https://v1.singlebase.io/api/proj"
+    );
+  });
+
+  it("treats an empty access key as none", () => {
+    expect(endpointFor({ ...base, urlAccessKey: "" })).toBe("https://v1.singlebase.io/api");
+    expect(endpointFor({ ...base, urlAccessKey: "  " })).toBe("https://v1.singlebase.io/api");
+  });
+
+  it("uses a custom base URL, ignoring a trailing slash", () => {
+    expect(
+      endpointFor({ ...base, baseUrl: "https://api.example.com/api/", urlAccessKey: "k" })
+    ).toBe("https://api.example.com/api/k");
+  });
+
+  it("rejects an explicitly null or empty base URL", () => {
+    expect(() => endpointFor({ ...base, baseUrl: null as unknown as string })).toThrow(
+      /cannot be null or empty/
+    );
+    expect(() => endpointFor({ ...base, baseUrl: "" })).toThrow(/cannot be null or empty/);
+  });
+
+  it("still refuses plain http outside localhost", () => {
+    expect(() => endpointFor({ ...base, baseUrl: "http://api.example.com" })).toThrow(/HTTPS/);
+    expect(endpointFor({ ...base, baseUrl: "http://localhost:8000/api" })).toBe(
+      "http://localhost:8000/api"
+    );
   });
 });

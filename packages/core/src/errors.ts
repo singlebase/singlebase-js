@@ -38,7 +38,7 @@ export class SinglebaseError extends Error {
 
 /**
  * Recommended UI behavior for a given server error code, taken verbatim from
- * component-spec.md's error-mapping table. UI components use this to decide
+ * the auth API's error-mapping table. UI components use this to decide
  * *behavior* (focus a field, trigger a refresh, sign out locally); the actual
  * copy shown to the user is left to each component/its `.messages` override.
  */

@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>singlebase-uploader</title>
+    <style>
+      body {
+        font:
+          14px/1.5 "Geist",
+          -apple-system,
+          "Segoe UI",
+          sans-serif;
+        background: #f4f4f5;
+        color: #16181a;
+        margin: 0;
+        padding: 32px 20px 64px;
+      }
+      main {
+        max-width: 560px;
+        margin: 0 auto;
+        display: grid;
+        gap: 30px;
+      }
+      h1 {
+        font-size: 18px;
+        margin: 0;
+      }
+      p.lede {
+        margin: 0;
+        color: #61666c;
+      }
+      .case {
+        display: grid;
+        gap: 10px;
+      }
+      .tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font:
+          11.5px ui-monospace,
+          monospace;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: #61666c;
+      }
+      .tag b {
+        padding: 2px 6px;
+        background: #fff;
+        border: 1px solid #e4e6e9;
+        border-radius: 4px;
+        color: #16181a;
+      }
+      #log {
+        font:
+          12px ui-monospace,
+          monospace;
+        white-space: pre-wrap;
+        background: #fff;
+        border: 1px solid #e4e6e9;
+        border-radius: 8px;
+        padding: 14px;
+        min-height: 60px;
+        color: #61666c;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div>
+        <h1>&lt;singlebase-uploader&gt;</h1>
+        <p class="lede">
+          Running against a mock client — nothing leaves your machine. Drop files on any card.
+        </p>
+      </div>
+
+      <div class="case">
+        <div class="tag"><b>4a</b> full · dropzone</div>
+        <singlebase-uploader
+          logo-text="ACME"
+          heading="Upload files"
+          description="Add one or more files. You can review the list before uploading."
+          accept=".pdf,.png,.jpg,.docx"
+          max-size="25MB"
+          max-files="10"
+        ></singlebase-uploader>
+      </div>
+
+      <div class="case">
+        <div class="tag"><b>4b</b> compact · attachments row</div>
+        <singlebase-uploader
+          view="compact"
+          accept=".pdf,.png,.jpg,.docx"
+          max-size="25MB"
+          max-files="10"
+          branding="false"
+        ></singlebase-uploader>
+      </div>
+
+      <div class="case">
+        <div class="tag"><b>4c</b> button · uploads on pick</div>
+        <singlebase-uploader view="button" max-files="1" branding="false">
+        </singlebase-uploader>
+      </div>
+
+      <div class="case">
+        <div class="tag"><b>4d</b> full · dark</div>
+        <singlebase-uploader
+          theme="dark"
+          logo-text="ACME"
+          heading="Upload files"
+          accept=".pdf,.png"
+          max-size="25MB"
+        ></singlebase-uploader>
+      </div>
+
+      <div class="case">
+        <div class="tag"><b>4e</b> per-format rules</div>
+        <singlebase-uploader
+          heading="Upload a document"
+          description="PDFs up to 10 pages, Word files up to 20 — and neither may be password protected."
+          accept=".pdf,.docx,.pptx"
+          max-files="5"
+          rules='{
+            "pdf":  { "maxPages": 10, "maxSize": "10MB", "allowProtected": false },
+            "docx": { "maxPages": 20, "maxSize": "10MB", "allowProtected": false },
+            "pptx": { "maxPages": 30, "allowProtected": false }
+          }'
+        ></singlebase-uploader>
+      </div>
+
+      <div class="case">
+        <div class="tag">events</div>
+        <div id="log">waiting…</div>
+      </div>
+    </main>
+
+    <script type="module">
+      import "../packages/singlebase-elements/dist/singlebase-elements.min.js";
+
+      const log = document.getElementById("log");
+      const say = (line) => {
+        log.textContent = `${line}\n${log.textContent}`.split("\n").slice(0, 12).join("\n");
+      };
+
+      /**
+       * Stands in for SinglebaseClient().files — same shape, same contract:
+       * per-file progress, per-file outcome, and a batch that survives one
+       * failure. Any file named *fail* is rejected, to exercise that path.
+       */
+      const mockClient = {
+        files: {
+          async upload(inputs, options) {
+            const completed = [];
+            const failed = [];
+            await Promise.all(
+              inputs.map(async (input) => {
+                for (let percent = 0; percent <= 100; percent += 20) {
+                  options?.onProgress?.({
+                    input,
+                    id: "mock",
+                    loaded: percent,
+                    total: 100,
+                    percent
+                  });
+                  await new Promise((r) => setTimeout(r, 90));
+                }
+                if (/fail/i.test(input.filename)) {
+                  failed.push({
+                    input,
+                    id: "mock",
+                    error: { code: "UPLOAD_FAILED", message: "Storage rejected the object" }
+                  });
+                } else {
+                  completed.push({
+                    input,
+                    id: "mock",
+                    file: { id: crypto.randomUUID(), name: input.newName ?? input.filename }
+                  });
+                }
+              })
+            );
+            return { completed, failed };
+          }
+        }
+      };
+
+      for (const el of document.querySelectorAll("singlebase-uploader")) {
+        el.client = mockClient;
+        el.addEventListener("singlebase-upload-selected", (e) =>
+          say(`selected · ${e.detail.files.length} staged`)
+        );
+        el.addEventListener("singlebase-upload-progress", (e) =>
+          say(`progress · ${e.detail.file.name} ${e.detail.percent}%`)
+        );
+        el.addEventListener("singlebase-upload-complete", (e) =>
+          say(`complete · ${e.detail.completed.length} ok, ${e.detail.failed.length} failed`)
+        );
+        el.addEventListener("singlebase-upload-error", (e) => say(`error · ${e.detail.message}`));
+      }
+
+      say("Tip: name a file *fail* to see the per-file failure path.");
+    </script>
+  </body>
+</html>

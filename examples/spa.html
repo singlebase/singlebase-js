@@ -76,7 +76,7 @@
         <button class="act" data-goto="signin">goto signin</button>
         <button class="act" data-goto="signup">goto signup</button>
         <button class="act" data-goto="forgot">goto forgot</button>
-        <button class="act" data-goto="my-account">goto my-account</button>
+        <button class="act" data-goto="account">goto account</button>
       </div>
       <div class="btns">
         <button class="act" id="btn-data">sbc.data.query()</button>
@@ -94,7 +94,7 @@
 <script type="module">
   // The standalone bundle carries Lit, core, auth and the service SDK, so a
   // plain file:// page needs no bundler and no import map.
-  import { SinglebaseClient } from "../packages/ui/dist/singlebase-authui.min.js";
+  import { SinglebaseClient } from "../packages/singlebase-elements/dist/singlebase-elements.min.js";
 
   const logEl = document.getElementById("log");
   const statusEl = document.getElementById("status");
@@ -172,18 +172,20 @@
     urlAccessKey: "demo",
     apiKey: "wk_demo",
     fetch: mockFetch,
-    autoRefresh: { skewSeconds: 870, idleAfterMs: 60_000 }, // refresh ~30s in, for the demo
-    on: {
-      load: (state) => line(`⚡ load            ${state.status}`),
-      signin: () => line("⚡ signin"),
-      signout: () => line("⚡ signout"),
-      signup: () => line("⚡ signup"),
-      session: (s) => line(`⚡ session         ${s ? "replaced" : "cleared"}`),
-      "account-updated": () => line("⚡ account-updated"),
-      "password-change": () => line("⚡ password-change"),
-      "email-change": () => line("⚡ email-change"),
-      expired: (d) => line(`⚡ expired         ${d.reason}`),
-      error: (d) => line(`⚡ error           ${d.operation}: ${d.code}`)
+    auth: {
+      autoRefresh: { skewSeconds: 870, idleAfterMs: 60_000 }, // refresh ~30s in, for the demo
+      on: {
+        load: (state) => line(`⚡ load            ${state.status}`),
+        signin: () => line("⚡ signin"),
+        signout: () => line("⚡ signout"),
+        signup: () => line("⚡ signup"),
+        session: (s) => line(`⚡ session         ${s ? "replaced" : "cleared"}`),
+        "account-updated": () => line("⚡ account-updated"),
+        "password-change": () => line("⚡ password-change"),
+        "email-change": () => line("⚡ email-change"),
+        expired: (d) => line(`⚡ expired         ${d.reason}`),
+        error: (d) => line(`⚡ error           ${d.operation}: ${d.code}`)
+      }
     }
   });
 
@@ -231,11 +233,16 @@
   };
 
   document.getElementById("btn-data").onclick = () =>
-    run("data.query", () => sbc.data.query({ limit: 10 }, { collection: "notes" }));
+    run("data.query", () => sbc.data.query({ collection: "notes", limit: 10 }));
   document.getElementById("btn-llm").onclick = () =>
     run("llm.summarize", () => sbc.llm.summarize({ text: "Ada Lovelace wrote the first program." }));
   document.getElementById("btn-dispatch").onclick = () =>
-    run("dispatch", () => sbc.dispatch({ operation: "data.insert", collection: "notes", payload: { body: "hi" } }));
+    run("dispatch", () =>
+      sbc.dispatch({
+        operation: "data.insert",
+        payload: { collection: "notes", data: { body: "hi" } }
+      })
+    );
   document.getElementById("btn-refresh").onclick = () => run("refreshSession", () => auth.refreshSession());
   document.getElementById("btn-logout").onclick = () => run("logout", () => auth.logout());
 </script>

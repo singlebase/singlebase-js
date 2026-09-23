@@ -1,0 +1,76 @@
+{
+  "name": "@singlebase/elements",
+  "version": "0.1.0",
+  "description": "Singlebase web components \u2014 authentication UI and file uploads as custom elements",
+  "homepage": "https://singlebase.cloud",
+  "type": "module",
+  "license": "MIT",
+  "files": [
+    "LICENSE",
+    "README.md",
+    "dist"
+  ],
+  "module": "dist/index.js",
+  "main": "dist/index.cjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./authui": {
+      "types": "./dist/authui.d.ts",
+      "import": "./dist/authui.js",
+      "require": "./dist/authui.cjs"
+    },
+    "./uploader": {
+      "types": "./dist/uploader.d.ts",
+      "import": "./dist/uploader.js",
+      "require": "./dist/uploader.cjs"
+    },
+    "./standalone": "./dist/singlebase-elements.min.js",
+    "./package.json": "./package.json"
+  },
+  "unpkg": "dist/singlebase-elements.min.js",
+  "jsdelivr": "dist/singlebase-elements.min.js",
+  "sideEffects": true,
+  "scripts": {
+    "build": "vite build && vite build --config vite.standalone.config.ts && tsc -p tsconfig.json --emitDeclarationOnly",
+    "test": "web-test-runner \"test/**/*.test.ts\" --node-resolve"
+  },
+  "dependencies": {
+    "@singlebase/core": "workspace:*",
+    "@singlebase/singlebase-sdk": "workspace:*",
+    "lit": "^3.2.0"
+  },
+  "devDependencies": {
+    "@esm-bundle/chai": "^4.3.4-fix.0",
+    "@open-wc/testing": "^4.0.0",
+    "@web/dev-server-esbuild": "^1.0.2",
+    "@web/test-runner": "^0.19.0",
+    "typescript": "^5.6.0",
+    "vite": "^5.4.0"
+  },
+  "keywords": [
+    "singlebase",
+    "web-components",
+    "custom-elements",
+    "lit",
+    "auth",
+    "authentication",
+    "upload",
+    "files"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/singlebase/singlebase-js.git",
+    "directory": "packages/singlebase-elements"
+  },
+  "bugs": {
+    "url": "https://github.com/singlebase/singlebase-js/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

@@ -39,11 +39,11 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/singlebase/singlebase-authui.git",
+    "url": "git+https://github.com/singlebase/singlebase-js.git",
     "directory": "packages/core"
   },
   "bugs": {
-    "url": "https://github.com/singlebase/singlebase-authui/issues"
+    "url": "https://github.com/singlebase/singlebase-js/issues"
   },
   "publishConfig": {
     "access": "public"

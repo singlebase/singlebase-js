@@ -1,7 +1,9 @@
 node_modules/
 dist/
+_trash/
 *.tsbuildinfo
 .DS_Store
 .history/
 coverage/
 *.log
+.claude
