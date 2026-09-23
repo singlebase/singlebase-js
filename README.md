@@ -246,6 +246,8 @@ pnpm -r publish --access public    # publish core, then the SDK, then elements
 - **Use `pnpm`, never `npm publish`.** pnpm replaces the internal
   `workspace:*` dependencies with real version numbers. npm doesn't, and the
   published packages would fail to install.
+- **Each package builds itself before publishing** (`prepublishOnly`), so a
+  stale or missing `dist` can't be published.
 - **Versions move together.** Bump all three packages to the same version
   before publishing, because each depends on the others' exact version.
 

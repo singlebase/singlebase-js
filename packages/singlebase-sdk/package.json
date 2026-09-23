@@ -22,6 +22,7 @@
   },
   "scripts": {
     "build": "vite build && tsc -p tsconfig.json --emitDeclarationOnly",
+    "prepublishOnly": "pnpm run build",
     "test": "NODE_OPTIONS=--experimental-vm-modules jest"
   },
   "dependencies": {
