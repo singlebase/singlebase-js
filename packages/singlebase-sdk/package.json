@@ -1,6 +1,6 @@
 {
   "name": "@singlebase/singlebase-sdk",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Singlebase client \u2014 auth, data, files, users and llm over one RPC pipe",
   "homepage": "https://singlebase.cloud",
   "type": "module",

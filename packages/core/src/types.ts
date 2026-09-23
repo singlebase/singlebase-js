@@ -15,7 +15,11 @@ export interface SinglebaseOptions {
   baseUrl?: string;
   /** The project's URL access key. Optional; when set it is appended to `baseUrl`. */
   urlAccessKey?: string;
-  apiKey: string;
+  /**
+   * The `wk_` web key. Optional; when set it is sent as `X-API-Key`. Only a
+   * web key ever belongs in browser code.
+   */
+  apiKey?: string;
   audience?: Audience;
   fetch?: typeof globalThis.fetch;
   /**

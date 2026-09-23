@@ -34,9 +34,9 @@ OAuth and the signed-in account view. Three smaller tags handle the rest:
 <singlebase-authui></singlebase-authui>
 ```
 
-`data-singlebase-api-key` is required. `data-singlebase-url-access-key` and
-`data-singlebase-base-url` are optional. The SDK is also exposed as
-`window.Singlebase`.
+`data-singlebase-api-key`, `data-singlebase-url-access-key` and
+`data-singlebase-base-url` are all optional; set at least one and the bundle
+creates the page's client. The SDK is also exposed as `window.Singlebase`.
 
 **npm:**
 

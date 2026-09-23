@@ -167,3 +167,26 @@ describe("endpoint", () => {
     );
   });
 });
+
+describe("API key", () => {
+  const capture = () => {
+    const seen: Record<string, string>[] = [];
+    const fetchMock = (async (_url: string, init: any) => {
+      seen.push(init.headers);
+      return { ok: true, json: async () => ({ data: {}, meta: {}, exec_time: 0 }) };
+    }) as unknown as typeof fetch;
+    return { seen, fetchMock };
+  };
+
+  it("sends X-API-Key when one is set", async () => {
+    const { seen, fetchMock } = capture();
+    await request({ apiKey: "wk_x", fetch: fetchMock }, "data.query", {});
+    expect(seen[0]["X-API-Key"]).toBe("wk_x");
+  });
+
+  it("is optional: no key, no header", async () => {
+    const { seen, fetchMock } = capture();
+    await request({ fetch: fetchMock }, "data.query", {});
+    expect("X-API-Key" in seen[0]).toBe(false);
+  });
+});

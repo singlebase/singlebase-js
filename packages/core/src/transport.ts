@@ -76,10 +76,8 @@ export async function request<TData = unknown, TPayload = unknown>(
   const envelope: RequestEnvelope<TPayload> = { operation, payload };
   if (extras.options) envelope.options = extras.options;
 
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-    "X-API-Key": clientOptions.apiKey
-  };
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (clientOptions.apiKey) headers["X-API-Key"] = clientOptions.apiKey;
   if (extras.token) {
     headers.Authorization = `Bearer ${extras.token}`;
   }

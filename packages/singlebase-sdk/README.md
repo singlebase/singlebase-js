@@ -11,8 +11,8 @@ npm install @singlebase/singlebase-sdk
 import { SinglebaseClient } from "@singlebase/singlebase-sdk";
 
 const sbc = SinglebaseClient({
-  apiKey: "wk_YOUR_WEB_KEY",
-  urlAccessKey: "YOUR_PROJECT_KEY" // optional
+  apiKey: "wk_YOUR_WEB_KEY",        // optional
+  urlAccessKey: "YOUR_PROJECT_KEY"  // optional
 });
 
 await sbc.auth.signIn({ email, password });

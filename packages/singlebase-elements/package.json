@@ -1,6 +1,6 @@
 {
   "name": "@singlebase/elements",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Singlebase web components \u2014 authentication UI and file uploads as custom elements",
   "homepage": "https://singlebase.cloud",
   "type": "module",

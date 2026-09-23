@@ -20,21 +20,25 @@ export { SinglebaseClient, SinglebaseAuth } from "@singlebase/singlebase-sdk";
 function autoConfig(): SinglebaseClientOptions | null {
   const script =
     (document.currentScript as HTMLScriptElement | null) ??
-    document.querySelector<HTMLScriptElement>("script[data-singlebase-api-key]");
+    document.querySelector<HTMLScriptElement>(
+      "script[data-singlebase-api-key], script[data-singlebase-url-access-key], script[data-singlebase-base-url]"
+    );
   if (!script) return null;
 
   const { baseUrl, singlebaseUrlAccessKey, singlebaseApiKey, singlebaseBaseUrl } =
     script.dataset as Record<string, string | undefined>;
 
-  const apiKey = singlebaseApiKey;
-  if (!apiKey) return null;
-
-  // Only what the tag actually sets: the SDK supplies the default base URL,
-  // and the access key is optional.
-  const config: SinglebaseClientOptions = { apiKey };
+  // Every connection option is optional, so a tag configures a client when it
+  // carries at least one of them. A bare tag is a plain library load: creating
+  // a client then would claim the page default before the app's own call.
   const base = singlebaseBaseUrl ?? baseUrl;
+  if (!singlebaseApiKey && !singlebaseUrlAccessKey && !base) return null;
+
+  // Only what the tag actually sets: the SDK supplies the default base URL.
+  const config: SinglebaseClientOptions = {};
   if (base) config.baseUrl = base;
   if (singlebaseUrlAccessKey) config.urlAccessKey = singlebaseUrlAccessKey;
+  if (singlebaseApiKey) config.apiKey = singlebaseApiKey;
   return config;
 }
 

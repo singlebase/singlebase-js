@@ -38,7 +38,7 @@ export function clientKey(options: SinglebaseOptions): string {
   return [
     options.baseUrl ?? DEFAULT_BASE_URL,
     options.urlAccessKey ?? "",
-    options.apiKey,
+    options.apiKey ?? "",
     options.audience ?? "web"
   ].join("|");
 }

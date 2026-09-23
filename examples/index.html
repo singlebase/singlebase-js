@@ -226,11 +226,11 @@
     const baseUrl = document.getElementById("cfg-baseUrl").value.trim();
     const urlAccessKey = document.getElementById("cfg-urlAccessKey").value.trim();
     const apiKey = document.getElementById("cfg-apiKey").value.trim();
-    if (!apiKey) return;
     for (const id of ["a", "b", "c", "d", "e"]) {
       const el = document.getElementById(id);
       el.settings = null;
-      const options = { apiKey, audience: id };
+      const options = { audience: id };
+      if (apiKey) options.apiKey = apiKey;
       if (baseUrl) options.baseUrl = baseUrl;
       if (urlAccessKey) options.urlAccessKey = urlAccessKey;
       el.client = SinglebaseAuth(options);

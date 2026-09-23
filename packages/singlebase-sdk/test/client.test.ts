@@ -211,3 +211,20 @@ describe("base URL", () => {
     expect(urls).toEqual(["https://v1.singlebase.io/api/p1", "https://v1.singlebase.io/api"]);
   });
 });
+
+describe("connection options", () => {
+  it("needs none of them: no key, default base URL", async () => {
+    const calls: { url: string; headers: Record<string, string> }[] = [];
+    const fetchImpl = (async (url: string, init: any) => {
+      calls.push({ url, headers: init.headers });
+      return { ok: true, json: async () => ({ data: {}, meta: {}, exec_time: 0 }) };
+    }) as unknown as typeof fetch;
+
+    await SinglebaseClient({ fetch: fetchImpl, auth: { autoRefresh: false } }).data.query({
+      collection: "n"
+    });
+
+    expect(calls[0].url).toBe("https://v1.singlebase.io/api");
+    expect("X-API-Key" in calls[0].headers).toBe(false);
+  });
+});

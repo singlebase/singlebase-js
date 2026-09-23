@@ -35,15 +35,15 @@ every element:
 import { SinglebaseClient } from "@singlebase/singlebase-sdk";
 
 const sbc = SinglebaseClient({
-  apiKey: "wk_YOUR_WEB_KEY",
-  urlAccessKey: "YOUR_PROJECT_KEY" // optional
+  apiKey: "wk_YOUR_WEB_KEY",        // optional
+  urlAccessKey: "YOUR_PROJECT_KEY"  // optional
 });
 ```
 
 | Option | Default | |
 | --- | --- | --- |
-| `apiKey` | — | **Required.** The `wk_` web key, sent as `X-API-Key` |
-| `baseUrl` | `https://v1.singlebase.io/api` | API root. Can't be null or empty; HTTPS outside localhost |
+| `baseUrl` | `https://v1.singlebase.io/api` | API root. Always set: omit it for the default, but it can't be null or empty. HTTPS outside localhost |
+| `apiKey` | — | Optional `wk_` web key, sent as `X-API-Key` when set |
 | `urlAccessKey` | — | Optional project key, appended to `baseUrl` |
 | `audience` | `"web"` | Token audience |
 | `fetch` | global `fetch` | Your own transport, for tests or proxies |
@@ -199,6 +199,10 @@ const answer = await sbc.llm.ask({ message: "What changed in Q3?" });
 ```
 
 ## Web components
+
+| `<singlebase-authui>` | `<singlebase-uploader>` |
+| --- | --- |
+| <img src="./docs/images/authui.png" alt="The sign-in screen of singlebase-authui" width="360"> | <img src="./docs/images/uploader.png" alt="singlebase-uploader with an image and a PDF staged" width="400"> |
 
 ```js
 import "@singlebase/elements";           // everything
