@@ -126,7 +126,7 @@ someone else. Administrative changes live under `sbc.users`.
 
 ### `sbc.data` — documents
 
-Documents in the project's KokoaDB collections. Every call needs
+Documents in the project's  collections. Every call needs
 `payload.collection`. These operations don't filter by owner automatically, so
 add your own ownership rules where needed.
 
