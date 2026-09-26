@@ -1,6 +1,6 @@
 {
   "name": "@singlebase/elements",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Singlebase web components — authentication UI, file uploads and AI chat as custom elements",
   "homepage": "https://singlebase.cloud",
   "type": "module",
