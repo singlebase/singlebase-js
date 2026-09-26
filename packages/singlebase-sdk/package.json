@@ -1,7 +1,7 @@
 {
   "name": "@singlebase/singlebase-sdk",
-  "version": "0.3.0",
-  "description": "Singlebase client \u2014 auth, data, files, users and llm over one RPC pipe",
+  "version": "0.4.0",
+  "description": "Singlebase client — auth, data, files, users and llm over one RPC pipe",
   "homepage": "https://singlebase.cloud",
   "type": "module",
   "license": "MIT",
