@@ -131,20 +131,20 @@ describe("envelope shape", () => {
 describe("endpoint", () => {
   const base = { apiKey: "wk_x" };
 
-  it("defaults to https://v1.singlebase.io/api", () => {
-    expect(endpointFor(base)).toBe("https://v1.singlebase.io/api");
-    expect(DEFAULT_BASE_URL).toBe("https://v1.singlebase.io/api");
+  it("defaults to https://v1.api.singlebase.io", () => {
+    expect(endpointFor(base)).toBe("https://v1.api.singlebase.io");
+    expect(DEFAULT_BASE_URL).toBe("https://v1.api.singlebase.io");
   });
 
   it("appends the access key when there is one", () => {
     expect(endpointFor({ ...base, urlAccessKey: "proj" })).toBe(
-      "https://v1.singlebase.io/api/proj"
+      "https://v1.api.singlebase.io/proj"
     );
   });
 
   it("treats an empty access key as none", () => {
-    expect(endpointFor({ ...base, urlAccessKey: "" })).toBe("https://v1.singlebase.io/api");
-    expect(endpointFor({ ...base, urlAccessKey: "  " })).toBe("https://v1.singlebase.io/api");
+    expect(endpointFor({ ...base, urlAccessKey: "" })).toBe("https://v1.api.singlebase.io");
+    expect(endpointFor({ ...base, urlAccessKey: "  " })).toBe("https://v1.api.singlebase.io");
   });
 
   it("uses a custom base URL, ignoring a trailing slash", () => {

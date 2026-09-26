@@ -1,6 +1,6 @@
 {
   "name": "@singlebase/core",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Singlebase client kernel \u2014 RPC transport, dispatcher, storage, errors",
   "homepage": "https://singlebase.cloud",
   "type": "module",

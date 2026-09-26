@@ -17,7 +17,7 @@ function isLocalHost(hostname: string): boolean {
 }
 
 /** Where requests go when `baseUrl` is not given. */
-export const DEFAULT_BASE_URL = "https://v1.singlebase.io/api";
+export const DEFAULT_BASE_URL = "https://v1.api.singlebase.io";
 
 /**
  * The effective API root: the default when `baseUrl` is omitted. An explicit

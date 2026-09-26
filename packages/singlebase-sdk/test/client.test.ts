@@ -189,7 +189,7 @@ describe("user namespace", () => {
 });
 
 describe("base URL", () => {
-  it("defaults to https://v1.singlebase.io/api and appends the access key", async () => {
+  it("defaults to https://v1.api.singlebase.io and appends the access key", async () => {
     const urls: string[] = [];
     const fetchImpl = (async (url: string) => {
       urls.push(url);
@@ -208,7 +208,7 @@ describe("base URL", () => {
       auth: { autoRefresh: false }
     }).data.query({ collection: "n" });
 
-    expect(urls).toEqual(["https://v1.singlebase.io/api/p1", "https://v1.singlebase.io/api"]);
+    expect(urls).toEqual(["https://v1.api.singlebase.io/p1", "https://v1.api.singlebase.io"]);
   });
 });
 
@@ -224,7 +224,7 @@ describe("connection options", () => {
       collection: "n"
     });
 
-    expect(calls[0].url).toBe("https://v1.singlebase.io/api");
+    expect(calls[0].url).toBe("https://v1.api.singlebase.io");
     expect("X-API-Key" in calls[0].headers).toBe(false);
   });
 });

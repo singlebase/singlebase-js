@@ -42,7 +42,7 @@ const sbc = SinglebaseClient({
 
 | Option | Default | |
 | --- | --- | --- |
-| `baseUrl` | `https://v1.singlebase.io/api` | API root. Always set: omit it for the default, but it can't be null or empty. HTTPS outside localhost |
+| `baseUrl` | `https://v1.api.singlebase.io` | API root. Always set: omit it for the default, but it can't be null or empty. HTTPS outside localhost |
 | `apiKey` | — | Optional `wk_` web key, sent as `X-API-Key` when set |
 | `urlAccessKey` | — | Optional project key, appended to `baseUrl` |
 | `audience` | `"web"` | Token audience |

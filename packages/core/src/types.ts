@@ -9,7 +9,7 @@ export type Audience = string;
 
 export interface SinglebaseOptions {
   /**
-   * The API root. Omit it to use `https://v1.singlebase.io/api`; it cannot be
+   * The API root. Omit it to use `https://v1.api.singlebase.io`; it cannot be
    * null or empty.
    */
   baseUrl?: string;
