@@ -1,5 +1,7 @@
-import { expect } from "@open-wc/testing";
+import { expect, fixture, html } from "@open-wc/testing";
 import "../src/elements/authui.js";
+import "../src/elements/uploader.js";
+import "../src/elements/chat.js";
 import { mountWidget, signedInClient, textOf } from "./fixtures.js";
 
 const badge = (el: { shadowRoot: ShadowRoot | null }) =>
@@ -87,5 +89,48 @@ describe("branding credit", () => {
     el.messages = { brandingLabel: "Authentification par Singlebase" };
     await el.updateComplete;
     expect(badge(el)!.textContent!.trim()).to.equal("Authentification par Singlebase");
+  });
+});
+
+describe("branding across elements", () => {
+  const mountAll = async (attrs = "") => {
+    const { el: auth } = await mountWidget();
+    const wrap = await fixture<HTMLDivElement>(
+      html`<div>
+        <singlebase-uploader></singlebase-uploader>
+        <singlebase-chat></singlebase-chat>
+      </div>`
+    );
+    const els = [auth, ...Array.from(wrap.children)] as any[];
+    for (const el of els) {
+      if (attrs) Object.assign(el, JSON.parse(attrs));
+      await el.updateComplete;
+    }
+    return els;
+  };
+
+  it("looks the same in the auth widget, the uploader and the chat", async () => {
+    const looks = (await mountAll()).map((el) => {
+      const style = getComputedStyle(el.shadowRoot!.querySelector('[part="branding"]')!);
+      return [style.fontFamily, style.fontSize, style.letterSpacing, style.textTransform].join("|");
+    });
+    expect(new Set(looks).size).to.equal(1);
+  });
+
+  it("takes a custom text and link on every element", async () => {
+    const els = await mountAll(
+      JSON.stringify({ brandingText: "Powered by Acme", brandingUrl: "https://acme.test/" })
+    );
+    for (const el of els) {
+      const a = badge(el)!;
+      expect(a.textContent!.trim()).to.equal("Powered by Acme");
+      expect(a.getAttribute("href")).to.equal("https://acme.test/");
+    }
+  });
+
+  it("refuses a non-http link", async () => {
+    const els = await mountAll(JSON.stringify({ brandingUrl: "javascript:alert(1)" }));
+    for (const el of els)
+      expect(badge(el)!.getAttribute("href")).to.equal("https://singlebase.cloud");
   });
 });

@@ -16,6 +16,8 @@ export const TOKEN_DEFAULTS = {
   accent: "#111111",
   onAccent: "#ffffff",
   radius: "4px",
+  /** Multiplies every corner. The `radius` attribute sets it per element. */
+  radiusScale: "1",
   surface: "#ffffff",
   surfaceAlt: "#fafafa",
   ink: "#16181a",
@@ -73,6 +75,21 @@ export const tokenDefaults = css`
     --sb-ok: #6fd1a6;
     --sb-ok-bg: rgba(111, 209, 166, 0.1);
     --sb-ok-border: rgba(111, 209, 166, 0.28);
+  }
+
+  /* Corner presets. They set the scale on this element only, so a page-wide
+     :root { --sb-radius-scale } (or --sb-radius) applies to every element
+     that doesn't carry the attribute. */
+  :host([radius="sharp"]) {
+    --sb-radius-scale: 0.35;
+  }
+
+  :host([radius="default"]) {
+    --sb-radius-scale: 1;
+  }
+
+  :host([radius="round"]) {
+    --sb-radius-scale: 1.8;
   }
 
   :host([density="compact"]) {

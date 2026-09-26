@@ -136,9 +136,10 @@ actual sign-in, not on a restored session.
 | `brand-line` / `brand-foot` | — | Copy for the split panel |
 | `sign-in-title` | — | Replace the sign-in heading |
 | `branding` | on | The "Auth by Singlebase" credit. `="false"` to hide. It makes no request |
+| `branding-text` / `branding-url` | — | The credit's text and link (http(s) only). Same on every Singlebase element |
 | `invite-email` / `invite-org` / `invite-code` | — | Prefill the invite screen |
 | `nonce-storage-key` | `singlebase-oauth-nonce` | Where the OAuth nonce is kept |
-| `theme` / `density` / `field-style` | — | See [Theming](#theming) |
+| `theme` / `density` / `field-style` / `radius` | — | See [Theming](#theming) |
 
 Default-on flags need the value spelled out to turn them off:
 `allow-oauth="false"`.
@@ -301,12 +302,26 @@ singlebase-authui { --sb-accent: #2f5bea; --sb-radius: 10px; --sb-font: "Inter",
 | `--sb-font` | Geist, system | `--sb-pad` | `20px` |
 | `--sb-mono` | Geist Mono | `--sb-field-pad` | `11px 13px` |
 | `--sb-logo-height` | `20px` | `--sb-brand-logo-height` | `28px` |
+| `--sb-radius-scale` | `1` | | |
 
 State colours have their own tokens too, such as `--sb-danger-bg` and
 `--sb-ok-border`.
 
-**Attributes.** `theme="dark"`, `density="compact"`, `field-style="underline"`.
-They combine with each other and with your tokens.
+**Attributes.** `theme="dark"`, `density="compact"`, `field-style="underline"`,
+`radius="sharp|default|round"`. They combine with each other and with your tokens.
+
+**Corners.** Every corner is `--sb-radius` × `--sb-radius-scale`. The `radius`
+attribute sets the scale (0.35, 1 or 1.8) on that one element; set the token on
+the page to change every Singlebase element at once:
+
+```css
+:root { --sb-radius-scale: 1.8; }                       /* everything: auth, uploader, chat */
+```
+```html
+<singlebase-chat radius="sharp"></singlebase-chat>      <!-- this element only -->
+```
+
+`radius` is also accepted in the page-wide `authui` config, like `theme`.
 
 **Parts.** For anything tokens don't reach:
 

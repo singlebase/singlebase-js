@@ -14,6 +14,8 @@ export interface AuthUIConfig {
   theme?: "light" | "dark";
   density?: "comfortable" | "compact";
   fieldStyle?: "outline" | "underline";
+  /** Corner preset: scales --sb-radius by 0.35, 1 or 1.8. */
+  radius?: "sharp" | "default" | "round";
 
   /** `--sb-*` custom properties, e.g. { "--sb-accent": "#2f5bea" }. */
   tokens?: Record<string, string>;
@@ -29,6 +31,9 @@ export interface AuthUIConfig {
   signInTitle?: string;
   /** The "Auth by Singlebase" credit under the card. On unless set false. */
   branding?: boolean;
+  /** The credit's text and link. */
+  brandingText?: string;
+  brandingUrl?: string;
 
   // ── screens & behaviour ──────────────────────────────────
   initialScreen?: string;
@@ -60,6 +65,7 @@ export const AUTHUI_PROP_KEYS = [
   "theme",
   "density",
   "fieldStyle",
+  "radius",
   "layout",
   "oauthPlacement",
   "stepped",
@@ -69,6 +75,8 @@ export const AUTHUI_PROP_KEYS = [
   "brandFoot",
   "signInTitle",
   "branding",
+  "brandingText",
+  "brandingUrl",
   "initialScreen",
   "noAccountView",
   "redirectUrl",

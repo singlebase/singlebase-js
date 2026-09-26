@@ -47,6 +47,10 @@ export abstract class SinglebaseElementBase extends LitElement {
   @property({ reflect: true, attribute: "field-style" })
   accessor fieldStyle: "outline" | "underline" | undefined = undefined;
 
+  /** Corner preset for this element: `sharp`, `default` or `round`. */
+  @property({ reflect: true })
+  accessor radius: "sharp" | "default" | "round" | undefined = undefined;
+
   protected auth = new AuthController(this);
 
   /**

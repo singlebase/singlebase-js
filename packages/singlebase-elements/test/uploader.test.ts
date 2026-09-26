@@ -510,3 +510,16 @@ describe("singlebase-uploader — rejections and reuse", () => {
     expect(el.files.map((f) => f.name)).to.deep.equal(["two.pdf"]);
   });
 });
+
+describe("configure()", () => {
+  it("applies only the keys given and chains", async () => {
+    const el = await fixture<SinglebaseUploader>(
+      html`<singlebase-uploader max-files="3"></singlebase-uploader>`
+    );
+    expect(el.configure({ view: "compact" }).configure({ radius: "round" })).to.equal(el);
+    await el.updateComplete;
+    expect(el.view).to.equal("compact");
+    expect(el.getAttribute("radius")).to.equal("round");
+    expect(el.maxFiles).to.equal(3);
+  });
+});

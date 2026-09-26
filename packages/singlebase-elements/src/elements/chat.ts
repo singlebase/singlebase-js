@@ -5,6 +5,8 @@ import { getDefaultClient } from "@singlebase/core";
 import type { SinglebaseClientInstance } from "@singlebase/singlebase-sdk";
 import { tokenDefaults } from "../styles/tokens.js";
 import { chatStyles } from "../styles/chat.js";
+import { brandingStyles } from "../styles/branding.js";
+import { renderBranding } from "../utils/branding.js";
 import { resolveChatMessages, type SinglebaseChatMessages } from "../chat-messages.js";
 import { fill } from "../upload-messages.js";
 import { formatSize } from "../utils/files.js";
@@ -17,18 +19,23 @@ import {
   parseMarkdown,
   plainText,
   provisionalTitle,
+  settleStreaming,
   splitFollowups,
   type Block,
   type ChartSpec,
-  type RenderAs
+  type ListItem,
+  type ChatFormat
 } from "../utils/markdown.js";
+import { svgDataUrl } from "../utils/svg.js";
 
 // ── public types ───────────────────────────────────────────
 
-export type ChatMode = "chat" | "rag" | "rich";
+export type ChatMode = "chat" | "rag";
 export type ChatEmbed = "page" | "inline" | "launcher";
 export type ChatGlow = "subtle" | "vivid" | "off";
 export type ChatExportFormat = "md" | "txt" | "json" | "copy";
+/** `auto` docks when there's room; `none` removes the list and its toggle. */
+export type ChatSidebar = "auto" | "open" | "closed" | "none";
 
 /** What the chat needs from a client: `llm.call`, and nothing else. */
 export type ChatClient = {
@@ -80,6 +87,30 @@ export interface ChatMessage {
   model?: string;
 }
 
+/**
+ * Draws a fenced block the host knows about, e.g. ```order {"id":"A-1"}```.
+ * Return a Lit template, a DOM node or text; return null to fall back to code.
+ */
+export type ChatBlockRenderer = (
+  source: string,
+  context: { lang: string; message: ChatMessage }
+) => unknown;
+
+/**
+ * Runs before each message is sent. Return the payload (changed or not), a new
+ * payload, or `false` to cancel. Anything else stops the send.
+ */
+export type ChatBeforeSend = (
+  payload: Record<string, unknown>,
+  context: { chatId: string | null; isNew: boolean; message: ChatMessage }
+) => Record<string, unknown> | false | Promise<Record<string, unknown> | false>;
+
+/** Runs after a reply is parsed. Return the blocks to draw. */
+export type ChatAfterParse = (
+  blocks: Block[],
+  context: { message: ChatMessage; format: ChatFormat }
+) => Block[];
+
 export interface ChatPrompt {
   label?: string;
   text: string;
@@ -87,25 +118,50 @@ export interface ChatPrompt {
 
 /** Every setting in one object, keyed by property name. */
 export interface ChatConfig {
+  /** The client to chat with. Defaults to the page's SinglebaseClient(). */
+  client: ChatClient | null;
+  /** Opens this saved chat. */
+  chatId: string;
   embed: ChatEmbed;
   mode: ChatMode;
-  renderAs: RenderAs;
+  format: ChatFormat;
+  renderers: Record<string, ChatBlockRenderer>;
+  beforeSend: ChatBeforeSend | null;
+  afterParse: ChatAfterParse | null;
   glow: ChatGlow;
   position: "right" | "left";
-  sidebar: boolean | undefined;
+  sidebar: ChatSidebar;
   showTitle: boolean;
   assistantName: string;
   logoUrl: string;
   heading: string;
   description: string;
+  eyebrow: string;
   prompts: string | (string | ChatPrompt)[];
   bubbleText: string;
   greetingBubble: boolean;
   unreadBadge: boolean;
   allowUpload: boolean;
   allowExport: boolean;
+  allowRaw: boolean;
+  allowCopy: boolean;
+  allowRegenerate: boolean;
+  allowBookmark: boolean;
+  allowDelete: boolean;
+  allowRename: boolean;
+  allowFeedback: boolean;
+  showTime: boolean;
+  showComposer: boolean;
+  footnote: string;
+  brandingText: string;
+  brandingUrl: string;
   branding: boolean;
   followups: boolean;
+  showFollowups: boolean;
+  showSources: boolean;
+  showNewChat: boolean;
+  showBookmarked: boolean;
+  allowSearch: boolean;
   autoTitle: boolean;
   model: string;
   params: Record<string, unknown>;
@@ -114,12 +170,16 @@ export interface ChatConfig {
   metadata: Record<string, unknown>;
   messages: Partial<SinglebaseChatMessages>;
   theme: "light" | "dark";
+  radius: "sharp" | "default" | "round";
 }
 
 const CONFIG_KEYS: readonly (keyof ChatConfig)[] = [
   "embed",
   "mode",
-  "renderAs",
+  "format",
+  "renderers",
+  "beforeSend",
+  "afterParse",
   "glow",
   "position",
   "sidebar",
@@ -128,14 +188,32 @@ const CONFIG_KEYS: readonly (keyof ChatConfig)[] = [
   "logoUrl",
   "heading",
   "description",
+  "eyebrow",
   "prompts",
   "bubbleText",
   "greetingBubble",
   "unreadBadge",
   "allowUpload",
   "allowExport",
+  "allowRaw",
+  "allowCopy",
+  "allowRegenerate",
+  "allowBookmark",
+  "allowDelete",
+  "allowRename",
+  "allowFeedback",
+  "showTime",
+  "showComposer",
+  "footnote",
+  "brandingText",
+  "brandingUrl",
   "branding",
   "followups",
+  "showFollowups",
+  "showSources",
+  "showNewChat",
+  "showBookmarked",
+  "allowSearch",
   "autoTitle",
   "model",
   "params",
@@ -143,7 +221,8 @@ const CONFIG_KEYS: readonly (keyof ChatConfig)[] = [
   "retrieval",
   "metadata",
   "messages",
-  "theme"
+  "theme",
+  "radius"
 ];
 
 // ── attribute converters ───────────────────────────────────
@@ -168,10 +247,17 @@ const flagAttr = {
   toAttribute: (value: boolean) => (value ? null : "false")
 };
 
-/** Absent means "decide for me". */
-const optionalFlagAttr = {
-  fromAttribute: (value: string | null) => (value === null ? undefined : value !== "false"),
-  toAttribute: (value: boolean | undefined) => (value === undefined ? null : String(value))
+/** Bare `sidebar` or `="true"` means open, `="false"` closed; unknown is auto. */
+const sidebarAttr = {
+  fromAttribute: (value: string | null): ChatSidebar => {
+    if (value === null) return "auto";
+    if (value === "" || value === "true") return "open";
+    if (value === "false") return "closed";
+    return (["auto", "open", "closed", "none"] as const).includes(value as ChatSidebar)
+      ? (value as ChatSidebar)
+      : "auto";
+  },
+  toAttribute: (value: ChatSidebar) => (value === "auto" ? null : value)
 };
 
 // ── constants ──────────────────────────────────────────────
@@ -183,6 +269,15 @@ const MAX_FILES = 5;
 const MAX_FILE_SIZE = 512 * 1024;
 const TEXT_FILE = /\.(md|markdown|txt|csv|tsv|json|html?|ya?ml|xml|log)$/i;
 const TOAST_MS = 5000;
+const MAX_TABLE_ROWS = 200;
+const MAX_JSON_NODES = 2000;
+const CALLOUT_MESSAGE = {
+  note: "calloutNote",
+  tip: "calloutTip",
+  important: "calloutImportant",
+  warning: "calloutWarning",
+  caution: "calloutCaution"
+} as const;
 const ARRIVED_MS = 2600;
 
 const CHART_COLORS = [
@@ -198,12 +293,29 @@ const MODE_PROMPTS: Record<ChatMode, string> = {
   rag:
     "Answer ONLY from the sources provided with each message, numbered in the order given. " +
     "Put a citation like [1] right after each claim it supports. " +
-    "If the sources don't cover the question, say so plainly.",
+    "If the sources don't cover the question, say so plainly."
+};
+
+/** What the model may write at each format level, so it only uses what renders. */
+const FORMAT_PROMPTS: Record<ChatFormat, string> = {
+  raw: "Reply in plain text. Don't use Markdown or any other markup.",
+  plain:
+    "Format with light Markdown only: short paragraphs, lists, **bold**, *italics*, `inline code`, code blocks and links. " +
+    "Don't use tables, charts, callouts, images or other special blocks.",
+  advanced:
+    "You can use Markdown: headings, lists, task lists, **bold**, *italics*, links, code blocks and pipe tables. " +
+    'For data, use a fenced "csv" block or a fenced "json" block. ' +
+    'For a diagram or illustration, write a self-contained fenced "svg" block with a viewBox, and no scripts, links or external images. ' +
+    "Don't use charts, callouts or images.",
   rich:
-    "Lead with one sentence stating the key finding, with key numbers in **bold**. " +
-    'For trends and comparisons, include a chart as a fenced code block with the language "chart" containing only JSON: ' +
+    "When the answer is about data, lead with one sentence stating the key finding, with key numbers in **bold**, then show the data visually. " +
+    "You can use Markdown: headings, lists, task lists, **bold**, *italics*, links, code blocks and pipe tables. " +
+    'For data, use a fenced "csv" block or a fenced "json" block. ' +
+    'For a diagram or illustration, write a self-contained fenced "svg" block with a viewBox, and no scripts, links or external images. ' +
+    'For trends and comparisons, use a fenced "chart" block containing only JSON: ' +
     '{"type":"bar"|"line","title":string,"unit":string,"labels":[string],"series":[{"name":string,"values":[number]}]}. ' +
-    "Use Markdown tables for exact values. Keep prose short."
+    "For notes and warnings, use callouts: a quote starting with [!NOTE], [!TIP], [!IMPORTANT], [!WARNING] or [!CAUTION]. " +
+    "Images use ![alt](https://…)."
 };
 
 const FOLLOWUP_PROMPT =
@@ -221,12 +333,6 @@ const DEFAULT_PROMPTS: Record<ChatMode, [string, string][]> = {
     ["Summarize", "Summarize the most important points"],
     ["Find", "Where is the refund policy described?"],
     ["Explain", "Explain the setup steps in plain language"]
-  ],
-  rich: [
-    ["Bar chart", "Compare the five most spoken languages in a bar chart"],
-    ["Line chart", "Show world population from 1950 to 2020"],
-    ["Table", "List the planets with their diameters in a table"],
-    ["Breakdown", "Break down a $4,000 monthly budget by category"]
   ]
 };
 
@@ -250,6 +356,7 @@ const I = {
     icon(
       svg`<rect x="5.5" y="5.5" width="8" height="8" rx="1.5"></rect><path d="M10.5 5.5v-2a1 1 0 0 0-1-1h-6a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2"></path>`
     ),
+  raw: () => icon(svg`<path d="M5.5 4.5L2 8l3.5 3.5M10.5 4.5L14 8l-3.5 3.5"></path>`),
   refresh: () => icon(svg`<path d="M13.5 8A5.5 5.5 0 1 1 11.9 4.1M13.5 2v3.5H10"></path>`),
   thumb: (down = false) =>
     html`<svg
@@ -397,7 +504,7 @@ interface Toast {
  */
 @customElement("singlebase-chat")
 export class SinglebaseChat extends LitElement {
-  static styles = [tokenDefaults, chatStyles];
+  static styles = [tokenDefaults, brandingStyles, chatStyles];
 
   // ── wiring ────────────────────────────────────────────────
   /** An explicit client. Omit it and the page's SinglebaseClient() is used. */
@@ -410,17 +517,53 @@ export class SinglebaseChat extends LitElement {
   @property({ reflect: true })
   accessor theme: "light" | "dark" | undefined = undefined;
 
+  /** Corner preset for this element: `sharp`, `default` or `round`. */
+  @property({ reflect: true })
+  accessor radius: "sharp" | "default" | "round" | undefined = undefined;
+
   // ── behaviour ─────────────────────────────────────────────
   /** `chat` free-form, `rag` grounded with citations, `rich` charts and tables. */
   @property({ reflect: true }) accessor mode: ChatMode = "chat";
 
-  /** How replies display. Copy and export always use the original text. */
-  @property({ attribute: "render-as" }) accessor renderAs: RenderAs = "rich";
+  /**
+   * How much of a reply is formatted: `raw` (the text as written), `plain`
+   * (light formatting), `advanced` (+ tables, CSV, JSON and SVG) or `rich`
+   * (+ callouts, charts, images and `renderers`). Copy and export always use
+   * the original text.
+   */
+  @property({ reflect: true }) accessor format: ChatFormat = "advanced";
+
+  /** Your own fenced blocks, by language. Drawn at the `rich` level. */
+  @property({ attribute: false }) accessor renderers: Record<string, ChatBlockRenderer> = {};
+
+  /**
+   * Preflight for every message: gets the `llm.chat` payload, returns it
+   * (changed or not), or `false` to cancel. May be async.
+   */
+  @property({ attribute: false }) accessor beforeSend: ChatBeforeSend | null = null;
+
+  /** Rewrites a reply's parsed blocks before they're drawn. Returns the blocks. */
+  @property({ attribute: false }) accessor afterParse: ChatAfterParse | null = null;
 
   @property({ reflect: true }) accessor glow: ChatGlow = "subtle";
 
-  /** Ask for follow-up questions with each reply. */
+  /** Ask the model for follow-up questions with each reply. */
   @property({ converter: flagAttr }) accessor followups = true;
+
+  /** The "Cited sources" cards and the "Searched n sources" row under answers. */
+  @property({ converter: flagAttr, attribute: "show-sources" }) accessor showSources = true;
+
+  /** The New chat button. */
+  @property({ converter: flagAttr, attribute: "show-new-chat" }) accessor showNewChat = true;
+
+  /** The pinned "Bookmarked" group in the chat list. */
+  @property({ converter: flagAttr, attribute: "show-bookmarked" }) accessor showBookmarked = true;
+
+  /** Show the follow-up questions under the latest reply. */
+  @property({ converter: flagAttr, attribute: "show-followups" }) accessor showFollowups = true;
+
+  /** The search box in the chat list. */
+  @property({ converter: flagAttr, attribute: "allow-search" }) accessor allowSearch = true;
 
   /** Replace the provisional title with a model-written one after the first reply. */
   @property({ converter: flagAttr, attribute: "auto-title" }) accessor autoTitle = true;
@@ -445,8 +588,11 @@ export class SinglebaseChat extends LitElement {
   /** Launcher side. */
   @property({ reflect: true }) accessor position: "right" | "left" = "right";
 
-  /** Force the chat list open or closed. Unset, it docks when there's room. */
-  @property({ converter: optionalFlagAttr }) accessor sidebar: boolean | undefined = undefined;
+  /**
+   * The chat list: `auto` docks it when there's room, `open` / `closed` set
+   * how it starts, `none` removes it and its toggle entirely.
+   */
+  @property({ converter: sidebarAttr }) accessor sidebar: ChatSidebar = "auto";
 
   @property({ converter: flagAttr, attribute: "show-title" }) accessor showTitle = true;
 
@@ -461,7 +607,13 @@ export class SinglebaseChat extends LitElement {
   @property() accessor heading = "";
   @property() accessor description = "";
 
-  /** Suggested prompts: `|`-separated in markup, an array in JavaScript. */
+  /** The small label above the heading. Unset uses the mode's; `""` hides it. */
+  @property() accessor eyebrow: string | undefined = undefined;
+
+  /**
+   * Suggested prompts: `|`-separated in markup, an array in JavaScript.
+   * `"none"` or `[]` shows no suggestions.
+   */
   @property() accessor prompts: string | (string | ChatPrompt)[] = "";
 
   @property({ attribute: "bubble-text" }) accessor bubbleText = "";
@@ -471,8 +623,50 @@ export class SinglebaseChat extends LitElement {
   @property({ converter: flagAttr, attribute: "allow-upload" }) accessor allowUpload = true;
   @property({ converter: flagAttr, attribute: "allow-export" }) accessor allowExport = true;
 
+  /** Copy buttons on messages. */
+  @property({ converter: flagAttr, attribute: "allow-copy" }) accessor allowCopy = true;
+
+  /** Regenerate on the latest reply. */
+  @property({ converter: flagAttr, attribute: "allow-regenerate" }) accessor allowRegenerate = true;
+
+  /** Bookmark buttons for chats and messages. */
+  @property({ converter: flagAttr, attribute: "allow-bookmark" }) accessor allowBookmark = true;
+
+  /** Delete buttons for chats and messages. */
+  @property({ converter: flagAttr, attribute: "allow-delete" }) accessor allowDelete = true;
+
+  /** Renaming a chat from its title or the chat list. */
+  @property({ converter: flagAttr, attribute: "allow-rename" }) accessor allowRename = true;
+
+  /** The helpful / not helpful buttons on replies. */
+  @property({ converter: flagAttr, attribute: "allow-feedback" }) accessor allowFeedback = true;
+
+  /**
+   * The message box. Off, the chat only shows the conversation — pair it with
+   * `chat-id` to display a saved chat read-only.
+   */
+  @property({ converter: flagAttr, attribute: "show-composer" }) accessor showComposer = true;
+
+  /** Message times in the toolbars. */
+  @property({ converter: flagAttr, attribute: "show-time" }) accessor showTime = true;
+
+  /**
+   * The line under the composer. Unset uses the default ("{name} can make
+   * mistakes…"); an empty string hides it.
+   */
+  @property() accessor footnote: string | undefined = undefined;
+
+  /** A per-reply toggle between the formatted answer and the text as written. */
+  @property({ type: Boolean, attribute: "allow-raw" }) accessor allowRaw = false;
+
   /** The "Chat by Singlebase" credit. A plain link — it makes no request. */
   @property({ converter: flagAttr }) accessor branding = true;
+
+  /** The credit's text. Empty uses the element's default ("… by Singlebase"). */
+  @property({ attribute: "branding-text" }) accessor brandingText = "";
+
+  /** Where the credit links to. Only http(s); anything else uses singlebase.cloud. */
+  @property({ attribute: "branding-url" }) accessor brandingUrl = "";
 
   // ── state ─────────────────────────────────────────────────
   @state() private accessor chatList: ChatSummary[] = [];
@@ -498,6 +692,9 @@ export class SinglebaseChat extends LitElement {
   @state() private accessor toast: Toast | null = null;
   @state() private accessor copiedKey = "";
   @state() private accessor retrievalOpen = new Set<string>();
+  @state() private accessor rawKeys = new Set<string>();
+  @state() private accessor hasSidebarContent = false;
+  @state() private accessor sorts = new Map<string, { col: number; dir: 1 | -1 }>();
   @state() private accessor arrivedKey = "";
   @state() private accessor dragging = false;
   @state() private accessor showJump = false;
@@ -520,6 +717,7 @@ export class SinglebaseChat extends LitElement {
   private media: MediaQueryList | null = null;
   private focusNext = "";
   private bubbleScheduled = false;
+  private pendingChatId = "";
 
   get msg(): SinglebaseChatMessages {
     return resolveChatMessages(this.messages);
@@ -540,21 +738,57 @@ export class SinglebaseChat extends LitElement {
     return this.msgs;
   }
 
+  /** `format`, falling back to the default for anything unknown. */
+  private get formatLevel(): ChatFormat {
+    return (["raw", "plain", "advanced", "rich"] as const).includes(this.format)
+      ? this.format
+      : "advanced";
+  }
+
   /** The loaded chat list. */
   get chats(): readonly ChatSummary[] {
     return this.chatList;
   }
 
+  /**
+   * Every setting in one object, keyed by property name:
+   *
+   *     chat.config = { client, mode: "rag", format: "rich", retrieval: [...], chatId: "…" };
+   *
+   * Unknown keys are ignored. `chatId` opens that chat; reading `config`
+   * returns the current settings with `chatId` as the open chat.
+   */
   set config(value: Partial<ChatConfig>) {
+    if (!value) return;
     const target = this as unknown as Record<string, unknown>;
+    if ("client" in value) this.client = value.client ?? null;
     for (const key of CONFIG_KEYS) {
-      if (value && key in value) target[key] = value[key];
+      if (key in value) target[key] = value[key];
     }
+    if (value.chatId && value.chatId !== this.activeId) {
+      if (this.hasUpdated) void this.openChat(value.chatId);
+      else this.chatIdAttr = value.chatId;
+    }
+  }
+
+  /**
+   * Changes settings on the fly. Only the keys you pass change; the chat keeps
+   * its conversation and re-renders in place. Returns the element, so calls chain.
+   *
+   *     chat.configure({ format: "rich" }).configure({ theme: "dark" });
+   */
+  configure(options: Partial<ChatConfig>): this {
+    this.config = options;
+    return this;
   }
 
   get config(): Partial<ChatConfig> {
     const source = this as unknown as Record<string, unknown>;
-    return Object.fromEntries(CONFIG_KEYS.map((key) => [key, source[key]]));
+    return {
+      client: this.client,
+      chatId: this.activeId ?? "",
+      ...Object.fromEntries(CONFIG_KEYS.map((key) => [key, source[key]]))
+    };
   }
 
   // ── lifecycle ─────────────────────────────────────────────
@@ -592,7 +826,11 @@ export class SinglebaseChat extends LitElement {
     if (changed.has("metadata") && (!this.metadata || typeof this.metadata !== "object")) {
       this.metadata = {};
     }
-    if (changed.has("sidebar") && this.sidebar !== undefined) this.sidebarOpen = this.sidebar;
+    if (changed.has("sidebar")) {
+      if (this.sidebar === "open") this.sidebarOpen = true;
+      else if (this.sidebar === "closed" || this.sidebar === "none") this.sidebarOpen = false;
+      else if (this.width) this.sidebarOpen = this.docked;
+    }
     if (this.embed === "launcher" && this.greetingBubble && !this.bubbleScheduled) {
       this.bubbleScheduled = true;
       this.later(() => {
@@ -616,13 +854,14 @@ export class SinglebaseChat extends LitElement {
           const width = Math.round(entry.contentRect.width);
           if (width === this.width) return;
           this.width = width;
-          if (this.sidebarOpen === null) this.sidebarOpen = this.sidebar ?? this.docked;
+          if (this.sidebarOpen === null) this.sidebarOpen = this.sidebar === "auto" && this.docked;
         });
         this.observer.observe(root);
       }
     }
 
     if (this.sidebarOpen && this.listState === "idle" && this.resolvedClient) void this.loadChats();
+    if (this.pendingChatId && this.resolvedClient) void this.openChat(this.pendingChatId);
 
     if (this.focusNext) {
       const target = this.renderRoot.querySelector<HTMLInputElement | HTMLTextAreaElement>(
@@ -669,6 +908,8 @@ export class SinglebaseChat extends LitElement {
   /** Starts a new, empty conversation. */
   newChat(): void {
     this.halt();
+    this.pendingChatId = "";
+    this.loadingThread = false;
     this.activeId = null;
     this.chatTitle = "";
     this.bookmarked = false;
@@ -691,11 +932,15 @@ export class SinglebaseChat extends LitElement {
     this.threadError = "";
     this.resetViewState();
     if (!client) {
-      this.threadError = this.msg.errNoClient;
+      // Opened before a client was set (common when `.client` is assigned
+      // after the element is created): open it as soon as one arrives.
+      this.pendingChatId = id;
+      this.loadingThread = true;
       return;
     }
 
     const run = ++this.run;
+    this.pendingChatId = "";
     this.loadingThread = true;
     try {
       const data = await client.llm.call<ChatSummary & { messages?: any[] }>("get_chat", {
@@ -898,6 +1143,7 @@ export class SinglebaseChat extends LitElement {
     return [
       this.systemMessage,
       MODE_PROMPTS[this.mode] ?? MODE_PROMPTS.chat,
+      FORMAT_PROMPTS[this.formatLevel],
       this.followups ? FOLLOWUP_PROMPT : ""
     ]
       .filter(Boolean)
@@ -955,7 +1201,42 @@ export class SinglebaseChat extends LitElement {
     const controller = new AbortController();
     this.abort = controller;
     const isNew = !this.activeId;
-    const payload = this.payloadFor(user);
+    let payload = this.payloadFor(user);
+
+    if (this.beforeSend) {
+      let out: unknown;
+      try {
+        out = await this.beforeSend(payload, { chatId: this.activeId, isNew, message: user });
+      } catch (error) {
+        out = error;
+      }
+      if (run !== this.run) return;
+      if (out === false) {
+        // Cancelled: nothing was sent, so undo the turn and give the text back.
+        this.msgs = this.msgs.filter((m) => m !== user && m !== bot);
+        this.draft = user.content;
+        this.busy = false;
+        this.abort = null;
+        return;
+      }
+      const valid =
+        !!out &&
+        typeof out === "object" &&
+        typeof (out as { message?: unknown }).message === "string";
+      if (!valid || !(out as { message: string }).message.trim()) {
+        // Never fall back to the unmodified request: a hook that strips data
+        // and forgets to return must not send the original.
+        console.error(
+          "[singlebase-chat] beforeSend must return the request object (with a message) or false to cancel; the message was not sent.",
+          out
+        );
+        this.failTurn(bot, this.msg.errGeneric, "BEFORE_SEND_INVALID");
+        this.busy = false;
+        this.abort = null;
+        return;
+      }
+      payload = out as Record<string, unknown>;
+    }
 
     try {
       const data = await client.llm.call<any>("chat", payload, { signal: controller.signal });
@@ -993,7 +1274,7 @@ export class SinglebaseChat extends LitElement {
         id: reply._id ?? null,
         content: text,
         sources: Array.isArray(reply.sources) ? reply.sources : [],
-        followups: this.followups ? followups : [],
+        followups,
         execTime: typeof reply.exec_time === "number" ? reply.exec_time : undefined,
         model: reply.model,
         at: Date.now()
@@ -1153,7 +1434,7 @@ export class SinglebaseChat extends LitElement {
       at: Date.parse(m._created_at ?? "") || 0,
       bookmarked: !!m.bookmarked,
       sources: Array.isArray(m.sources) ? m.sources : [],
-      followups: this.followups ? followups : [],
+      followups,
       phase: "done",
       execTime: typeof m.exec_time === "number" ? m.exec_time : undefined,
       model: m.model
@@ -1236,6 +1517,13 @@ export class SinglebaseChat extends LitElement {
     this.msgs = this.msgs.slice(0, index);
     await this.deleteOnServer(removed.map((x) => x.id));
     await this.runTurn(this.userMessage(text, m.attachments));
+  }
+
+  private toggleRaw(key: string) {
+    const next = new Set(this.rawKeys);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    this.rawKeys = next;
   }
 
   private copy(key: string, text: string) {
@@ -1458,7 +1746,8 @@ export class SinglebaseChat extends LitElement {
 
   // ── drag and drop ─────────────────────────────────────────
   private onDragEnter(event: DragEvent) {
-    if (!this.allowUpload || !Array.from(event.dataTransfer?.types ?? []).includes("Files")) return;
+    if (!this.allowUpload || !this.showComposer) return;
+    if (!Array.from(event.dataTransfer?.types ?? []).includes("Files")) return;
     event.preventDefault();
     this.dragging = true;
   }
@@ -1539,7 +1828,7 @@ export class SinglebaseChat extends LitElement {
           ? html`<div class="scrim" @click=${() => (this.sidebarOpen = false)}></div>`
           : nothing
       }
-      ${this.sidebarOpen ? this.renderSidebar(overlay) : nothing}
+      ${this.sidebarOpen && this.sidebar !== "none" ? this.renderSidebar(overlay) : nothing}
       <main
         class="main"
         @dragenter=${this.onDragEnter}
@@ -1569,15 +1858,7 @@ export class SinglebaseChat extends LitElement {
             : nothing
         }
         ${this.renderComposer()}
-        ${
-          this.branding
-            ? html`<div class="branding" part="branding">
-                <a href="https://singlebase.cloud" target="_blank" rel="noopener noreferrer"
-                  >${this.msg.brandingLabel}</a
-                >
-              </div>`
-            : nothing
-        }
+        ${renderBranding(this.branding, this.brandingText, this.msg.brandingLabel, this.brandingUrl)}
         ${
           this.toast
             ? html`<div class="toast" role="status">
@@ -1609,30 +1890,20 @@ export class SinglebaseChat extends LitElement {
 
   private renderSidebar(overlay: boolean) {
     const msg = this.msg;
-    const query = this.search.trim().toLowerCase();
+    const query = this.allowSearch ? this.search.trim().toLowerCase() : "";
     const shown = this.chatList.filter(
       (chat) => !query || (chat.title ?? "").toLowerCase().includes(query)
     );
+    // Bookmarked chats get their own group on top, unless show-bookmarked is off.
+    const pinned = (c: ChatSummary) => this.showBookmarked && !!c.bookmarked;
+    const inDay = (day: ReturnType<typeof dayGroup>) =>
+      shown.filter((c) => !pinned(c) && dayGroup(c._modified_at ?? c._created_at) === day);
     const groups: [string, ChatSummary[]][] = [
-      [msg.groupBookmarked, shown.filter((c) => c.bookmarked)],
-      [
-        msg.groupToday,
-        shown.filter((c) => !c.bookmarked && dayGroup(c._modified_at ?? c._created_at) === "today")
-      ],
-      [
-        msg.groupYesterday,
-        shown.filter(
-          (c) => !c.bookmarked && dayGroup(c._modified_at ?? c._created_at) === "yesterday"
-        )
-      ],
-      [
-        msg.groupWeek,
-        shown.filter((c) => !c.bookmarked && dayGroup(c._modified_at ?? c._created_at) === "week")
-      ],
-      [
-        msg.groupOlder,
-        shown.filter((c) => !c.bookmarked && dayGroup(c._modified_at ?? c._created_at) === "older")
-      ]
+      [msg.groupBookmarked, shown.filter(pinned)],
+      [msg.groupToday, inDay("today")],
+      [msg.groupYesterday, inDay("yesterday")],
+      [msg.groupWeek, inDay("week")],
+      [msg.groupOlder, inDay("older")]
     ];
 
     let body: unknown;
@@ -1672,19 +1943,34 @@ export class SinglebaseChat extends LitElement {
         </button>
       </div>
       <div class="side-tools">
-        <button type="button" class="new-chat" @click=${() => this.newChat()}>
-          ${I.plus()}<span>${msg.newChat}</span>
-        </button>
-        <input
-          class="search"
-          type="search"
-          placeholder=${msg.searchChats}
-          aria-label=${msg.searchChats}
-          .value=${this.search}
-          @input=${(e: Event) => (this.search = (e.target as HTMLInputElement).value)}
-        />
+        ${
+          this.showNewChat
+            ? html`<button type="button" class="new-chat" @click=${() => this.newChat()}>
+                ${I.plus()}<span>${msg.newChat}</span>
+              </button>`
+            : nothing
+        }
+        ${
+          this.allowSearch
+            ? html`<input
+                class="search"
+                type="search"
+                placeholder=${msg.searchChats}
+                aria-label=${msg.searchChats}
+                .value=${this.search}
+                @input=${(e: Event) => (this.search = (e.target as HTMLInputElement).value)}
+              />`
+            : nothing
+        }
       </div>
       <div class="threads">${body}</div>
+      <div class="side-extra ${this.hasSidebarContent ? "filled" : ""}" part="sidebar-extra">
+        <slot
+          name="sidebar"
+          @slotchange=${(e: Event) =>
+            (this.hasSidebarContent = (e.target as HTMLSlotElement).assignedNodes().length > 0)}
+        ></slot>
+      </div>
     </aside>`;
   }
 
@@ -1725,36 +2011,48 @@ export class SinglebaseChat extends LitElement {
     >
       <span class="thread-title">${title}</span>
       <span class="thread-actions">
-        <button
-          type="button"
-          class="icon sm ${chat.bookmarked ? "on" : ""}"
-          title=${chat.bookmarked ? msg.unbookmarkChat : msg.bookmarkChat}
-          aria-label=${chat.bookmarked ? msg.unbookmarkChat : msg.bookmarkChat}
-          @click=${stop(() => this.toggleChatBookmark(chat._id))}
-        >
-          ${I.bookmark(!!chat.bookmarked)}
-        </button>
-        <button
-          type="button"
-          class="icon sm"
-          title=${msg.renameChat}
-          aria-label=${msg.renameChat}
-          @click=${stop(() => {
-            this.renamingId = chat._id;
-            this.focusNext = "input.thread-rename";
-          })}
-        >
-          ${I.pencil()}
-        </button>
-        <button
-          type="button"
-          class="icon sm danger"
-          title=${msg.deleteChat}
-          aria-label=${msg.deleteChat}
-          @click=${stop(() => this.deleteChat(chat._id))}
-        >
-          ${I.trash()}
-        </button>
+        ${
+          this.allowBookmark
+            ? html`<button
+                type="button"
+                class="icon sm ${chat.bookmarked ? "on" : ""}"
+                title=${chat.bookmarked ? msg.unbookmarkChat : msg.bookmarkChat}
+                aria-label=${chat.bookmarked ? msg.unbookmarkChat : msg.bookmarkChat}
+                @click=${stop(() => this.toggleChatBookmark(chat._id))}
+              >
+                ${I.bookmark(!!chat.bookmarked)}
+              </button>`
+            : nothing
+        }
+        ${
+          this.allowRename
+            ? html`<button
+                type="button"
+                class="icon sm"
+                title=${msg.renameChat}
+                aria-label=${msg.renameChat}
+                @click=${stop(() => {
+                  this.renamingId = chat._id;
+                  this.focusNext = "input.thread-rename";
+                })}
+              >
+                ${I.pencil()}
+              </button>`
+            : nothing
+        }
+        ${
+          this.allowDelete
+            ? html`<button
+                type="button"
+                class="icon sm danger"
+                title=${msg.deleteChat}
+                aria-label=${msg.deleteChat}
+                @click=${stop(() => this.deleteChat(chat._id))}
+              >
+                ${I.trash()}
+              </button>`
+            : nothing
+        }
       </span>
     </div>`;
   }
@@ -1787,8 +2085,8 @@ export class SinglebaseChat extends LitElement {
             type="button"
             class="title"
             part="title"
-            ?disabled=${!hasChat}
-            title=${hasChat ? msg.renameChat : ""}
+            ?disabled=${!hasChat || !this.allowRename}
+            title=${hasChat && this.allowRename ? msg.renameChat : ""}
             @click=${() => {
               this.editingTitle = true;
               this.focusNext = "input.title-input";
@@ -1801,7 +2099,7 @@ export class SinglebaseChat extends LitElement {
     return html`<header class="header" part="header">
       <div class="header-left">
         ${
-          this.sidebarOpen && this.docked
+          this.sidebar === "none" || (this.sidebarOpen && this.docked)
             ? nothing
             : html`<button
                 type="button"
@@ -1816,16 +2114,34 @@ export class SinglebaseChat extends LitElement {
         ${title}
       </div>
       <div class="header-right">
-        <button
-          type="button"
-          class="icon ${this.bookmarked ? "on" : ""}"
-          ?disabled=${!hasChat}
-          title=${this.bookmarked ? msg.unbookmarkChat : msg.bookmarkChat}
-          aria-label=${this.bookmarked ? msg.unbookmarkChat : msg.bookmarkChat}
-          @click=${() => this.activeId && this.toggleChatBookmark(this.activeId)}
-        >
-          ${I.bookmark(this.bookmarked)}
-        </button>
+        ${
+          this.sidebar === "none" && this.showNewChat
+            ? html`<button
+                type="button"
+                class="icon"
+                ?disabled=${!this.msgs.length && !hasChat}
+                title=${msg.newChat}
+                aria-label=${msg.newChat}
+                @click=${() => this.newChat()}
+              >
+                ${I.plus()}
+              </button>`
+            : nothing
+        }
+        ${
+          this.allowBookmark
+            ? html`<button
+                type="button"
+                class="icon ${this.bookmarked ? "on" : ""}"
+                ?disabled=${!hasChat}
+                title=${this.bookmarked ? msg.unbookmarkChat : msg.bookmarkChat}
+                aria-label=${this.bookmarked ? msg.unbookmarkChat : msg.bookmarkChat}
+                @click=${() => this.activeId && this.toggleChatBookmark(this.activeId)}
+              >
+                ${I.bookmark(this.bookmarked)}
+              </button>`
+            : nothing
+        }
         ${
           this.allowExport
             ? html`<div class="menu-wrap">
@@ -1845,16 +2161,20 @@ export class SinglebaseChat extends LitElement {
               </div>`
             : nothing
         }
-        <button
-          type="button"
-          class="icon danger"
-          ?disabled=${!hasChat}
-          title=${msg.deleteChat}
-          aria-label=${msg.deleteChat}
-          @click=${() => this.activeId && this.deleteChat(this.activeId)}
-        >
-          ${I.trash()}
-        </button>
+        ${
+          this.allowDelete
+            ? html`<button
+                type="button"
+                class="icon danger"
+                ?disabled=${!hasChat}
+                title=${msg.deleteChat}
+                aria-label=${msg.deleteChat}
+                @click=${() => this.activeId && this.deleteChat(this.activeId)}
+              >
+                ${I.trash()}
+              </button>`
+            : nothing
+        }
         ${
           canExpand || minimize
             ? html`<span class="divider"></span> ${
@@ -1914,14 +2234,16 @@ export class SinglebaseChat extends LitElement {
       </div>`;
   }
 
+  /** The suggestion cards. `[]` or `"none"` shows none; unset uses the mode's. */
   private promptList(): ChatPrompt[] {
     const custom = this.prompts;
-    if (Array.isArray(custom) && custom.length) {
+    if (Array.isArray(custom)) {
       return custom
         .map((p) => (typeof p === "string" ? { text: p } : p))
         .filter((p) => p?.text)
         .slice(0, 4);
     }
+    if (typeof custom === "string" && custom.trim().toLowerCase() === "none") return [];
     if (typeof custom === "string" && custom.trim()) {
       return custom
         .split("|")
@@ -1938,33 +2260,44 @@ export class SinglebaseChat extends LitElement {
 
   private renderWelcome() {
     const msg = this.msg;
-    const mode = this.mode === "rag" ? "Rag" : this.mode === "rich" ? "Rich" : "Chat";
+    const mode = this.mode === "rag" ? "Rag" : "Chat";
     const pick = (key: string) => msg[`${key}${mode}` as keyof SinglebaseChatMessages];
-    return html`<div class="welcome" part="welcome">
-      <div class="welcome-head">
-        ${
-          this.logoUrl && isSafeUrl(this.logoUrl, true)
-            ? html`<img class="welcome-logo" src=${this.logoUrl} alt="" />`
-            : nothing
-        }
-        <span class="label">${pick("eyebrow")}</span>
-        <h2>${this.heading || pick("heading")}</h2>
-        <p>${this.description || pick("description")}</p>
-      </div>
-      <div class="prompts">
-        ${this.promptList().map(
-          (p) =>
-            html`<button
-              type="button"
-              class="prompt"
-              part="prompt"
-              @click=${() => this.send(p.text)}
-            >
-              <span class="label">${p.label || "Suggested"}</span>
-              <span class="prompt-text">${p.text}</span>
-            </button>`
-        )}
-      </div>
+    const eyebrow = this.eyebrow ?? pick("eyebrow");
+    const prompts = this.promptList();
+    // Anything the page puts in slot="welcome" replaces this whole screen.
+    return html`<div class="welcome-slot">
+      <slot name="welcome"
+        ><div class="welcome" part="welcome">
+          <div class="welcome-head">
+            ${
+              this.logoUrl && isSafeUrl(this.logoUrl, true)
+                ? html`<img class="welcome-logo" src=${this.logoUrl} alt="" />`
+                : nothing
+            }
+            ${eyebrow ? html`<span class="label">${eyebrow}</span>` : nothing}
+            <h2>${this.heading || pick("heading")}</h2>
+            <p>${this.description || pick("description")}</p>
+          </div>
+          ${
+            prompts.length
+              ? html`<div class="prompts">
+                  ${prompts.map(
+                    (p) =>
+                      html`<button
+                        type="button"
+                        class="prompt"
+                        part="prompt"
+                        @click=${() => this.send(p.text)}
+                      >
+                        <span class="label">${p.label || "Suggested"}</span>
+                        <span class="prompt-text">${p.text}</span>
+                      </button>`
+                  )}
+                </div>`
+              : nothing
+          }
+        </div></slot
+      >
     </div>`;
   }
 
@@ -2038,8 +2371,8 @@ export class SinglebaseChat extends LitElement {
             </div>`
           : html`<div class="bubble-user">${m.content}</div>
               <div class="toolbar">
-                ${m.bookmarked ? html`<span class="saved">${I.bookmark(true)}${msg.saved}</span>` : nothing}
-                <span class="time">${time}</span>
+                ${this.allowBookmark && m.bookmarked ? html`<span class="saved">${I.bookmark(true)}${msg.saved}</span>` : nothing}
+                ${this.showTime ? html`<span class="time">${time}</span>` : nothing}
                 ${
                   !this.busy
                     ? html`<button
@@ -2057,17 +2390,21 @@ export class SinglebaseChat extends LitElement {
                       </button>`
                     : nothing
                 }
-                <button
-                  type="button"
-                  class="icon"
-                  title=${this.copiedKey === m.key ? msg.copied : msg.copy}
-                  aria-label=${msg.copy}
-                  @click=${() => this.copy(m.key, m.content)}
-                >
-                  ${I.copy()}
-                </button>
                 ${
-                  m.id
+                  this.allowCopy
+                    ? html`<button
+                        type="button"
+                        class="icon"
+                        title=${this.copiedKey === m.key ? msg.copied : msg.copy}
+                        aria-label=${msg.copy}
+                        @click=${() => this.copy(m.key, m.content)}
+                      >
+                        ${I.copy()}
+                      </button>`
+                    : nothing
+                }
+                ${
+                  this.allowBookmark && m.id
                     ? html`<button
                         type="button"
                         class="icon ${m.bookmarked ? "on" : ""}"
@@ -2079,15 +2416,19 @@ export class SinglebaseChat extends LitElement {
                       </button>`
                     : nothing
                 }
-                <button
-                  type="button"
-                  class="icon danger"
-                  title=${msg.deleteMessage}
-                  aria-label=${msg.deleteMessage}
-                  @click=${() => this.deleteMessage(m)}
-                >
-                  ${I.trash()}
-                </button>
+                ${
+                  this.allowDelete
+                    ? html`<button
+                        type="button"
+                        class="icon danger"
+                        title=${msg.deleteMessage}
+                        aria-label=${msg.deleteMessage}
+                        @click=${() => this.deleteMessage(m)}
+                      >
+                        ${I.trash()}
+                      </button>`
+                    : nothing
+                }
               </div>`
       }
     </div>`;
@@ -2095,7 +2436,6 @@ export class SinglebaseChat extends LitElement {
 
   private pillLabel(): string {
     if (this.mode === "rag") return this.msg.searching;
-    if (this.mode === "rich") return this.msg.building;
     return this.msg.thinking;
   }
 
@@ -2127,7 +2467,7 @@ export class SinglebaseChat extends LitElement {
           : nothing
       }
       <div class="bot-body">
-        ${m.bookmarked ? html`<span class="saved">${I.bookmark(true)}${msg.saved}</span>` : nothing}
+        ${this.allowBookmark && m.bookmarked ? html`<span class="saved">${I.bookmark(true)}${msg.saved}</span>` : nothing}
         ${
           pending
             ? html`<div class="pill" role="status">
@@ -2137,7 +2477,7 @@ export class SinglebaseChat extends LitElement {
             : nothing
         }
         ${
-          count && !pending
+          this.showSources && count && !pending
             ? html`<div class="retrieval">
                 <button
                   type="button"
@@ -2201,7 +2541,7 @@ export class SinglebaseChat extends LitElement {
             : nothing
         }
         ${
-          done && cards.length
+          this.showSources && done && cards.length
             ? html`<div class="cards">
                 <span class="label">${cited.size ? msg.sourcesCited : msg.sourcesRetrieved}</span>
                 <div class="card-grid">
@@ -2227,17 +2567,35 @@ export class SinglebaseChat extends LitElement {
         ${
           done
             ? html`<div class="toolbar ${latest ? "pinned" : ""}">
-                <button
-                  type="button"
-                  class="icon"
-                  title=${this.copiedKey === m.key ? msg.copied : msg.copy}
-                  aria-label=${msg.copy}
-                  @click=${() => this.copy(m.key, copyText)}
-                >
-                  ${I.copy()}
-                </button>
                 ${
-                  latest && !this.busy
+                  this.allowCopy
+                    ? html`<button
+                        type="button"
+                        class="icon"
+                        title=${this.copiedKey === m.key ? msg.copied : msg.copy}
+                        aria-label=${msg.copy}
+                        @click=${() => this.copy(m.key, copyText)}
+                      >
+                        ${I.copy()}
+                      </button>`
+                    : nothing
+                }
+                ${
+                  this.allowRaw && this.formatLevel !== "raw" && m.content
+                    ? html`<button
+                        type="button"
+                        class="icon ${this.rawKeys.has(m.key) ? "on" : ""}"
+                        title=${this.rawKeys.has(m.key) ? msg.showFormatted : msg.showRaw}
+                        aria-label=${msg.showRaw}
+                        aria-pressed=${this.rawKeys.has(m.key) ? "true" : "false"}
+                        @click=${() => this.toggleRaw(m.key)}
+                      >
+                        ${I.raw()}
+                      </button>`
+                    : nothing
+                }
+                ${
+                  this.allowRegenerate && latest && !this.busy
                     ? html`<button
                         type="button"
                         class="icon"
@@ -2250,7 +2608,7 @@ export class SinglebaseChat extends LitElement {
                     : nothing
                 }
                 ${
-                  m.id
+                  this.allowBookmark && m.id
                     ? html`<button
                         type="button"
                         class="icon ${m.bookmarked ? "on" : ""}"
@@ -2262,47 +2620,53 @@ export class SinglebaseChat extends LitElement {
                       </button>`
                     : nothing
                 }
-                <button
-                  type="button"
-                  class="icon danger"
-                  title=${msg.deleteMessage}
-                  aria-label=${msg.deleteMessage}
-                  @click=${() => this.deleteMessage(m)}
-                >
-                  ${I.trash()}
-                </button>
-                <span class="time">${time}</span>
+                ${
+                  this.allowDelete
+                    ? html`<button
+                        type="button"
+                        class="icon danger"
+                        title=${msg.deleteMessage}
+                        aria-label=${msg.deleteMessage}
+                        @click=${() => this.deleteMessage(m)}
+                      >
+                        ${I.trash()}
+                      </button>`
+                    : nothing
+                }
+                ${this.showTime ? html`<span class="time">${time}</span>` : nothing}
                 ${m.stopped ? html`<span class="note">${msg.stopped}</span>` : nothing}
                 <span class="spacer"></span>
                 ${
-                  m.feedback
-                    ? html`<span class="note"
-                        >${m.feedback === "up" ? msg.markedHelpful : msg.thanksFeedback}</span
-                      >`
-                    : html`<button
-                          type="button"
-                          class="icon"
-                          title=${msg.helpful}
-                          aria-label=${msg.helpful}
-                          @click=${() => this.feedback(m, "up")}
-                        >
-                          ${I.thumb()}
-                        </button>
-                        <button
-                          type="button"
-                          class="icon"
-                          title=${msg.notHelpful}
-                          aria-label=${msg.notHelpful}
-                          @click=${() => this.feedback(m, "down")}
-                        >
-                          ${I.thumb(true)}
-                        </button>`
+                  !this.allowFeedback
+                    ? nothing
+                    : m.feedback
+                      ? html`<span class="note"
+                          >${m.feedback === "up" ? msg.markedHelpful : msg.thanksFeedback}</span
+                        >`
+                      : html`<button
+                            type="button"
+                            class="icon"
+                            title=${msg.helpful}
+                            aria-label=${msg.helpful}
+                            @click=${() => this.feedback(m, "up")}
+                          >
+                            ${I.thumb()}
+                          </button>
+                          <button
+                            type="button"
+                            class="icon"
+                            title=${msg.notHelpful}
+                            aria-label=${msg.notHelpful}
+                            @click=${() => this.feedback(m, "down")}
+                          >
+                            ${I.thumb(true)}
+                          </button>`
                 }
               </div>`
             : nothing
         }
         ${
-          done && latest && !this.busy && m.followups.length
+          this.showFollowups && done && latest && !this.busy && m.followups.length
             ? html`<div class="followups">
                 ${m.followups.map(
                   (q) =>
@@ -2324,8 +2688,25 @@ export class SinglebaseChat extends LitElement {
         ? nothing
         : html`<div class="answer"><p class="note">${this.msg.emptyReply}</p></div>`;
     }
-    const blocks = adaptBlocks(parseMarkdown(m.content), this.renderAs);
-    const maxCite = this.renderAs === "text" ? 0 : m.sources.length;
+    const level = this.formatLevel;
+    if (level === "raw" || (this.allowRaw && this.rawKeys.has(m.key))) {
+      return html`<div class="answer" part="answer"><p class="raw">${m.content}</p></div>`;
+    }
+    const source = m.phase === "streaming" ? settleStreaming(m.content) : m.content;
+    let blocks = adaptBlocks(parseMarkdown(source), level);
+    if (this.afterParse) {
+      try {
+        const out = this.afterParse(blocks, { message: m, format: level });
+        if (Array.isArray(out)) blocks = out;
+        else
+          console.warn(
+            "[singlebase-chat] afterParse must return an array of blocks; showing the original."
+          );
+      } catch (error) {
+        console.warn("[singlebase-chat] afterParse failed; showing the original.", error);
+      }
+    }
+    const maxCite = m.sources.length;
     return html`<div class="answer" part="answer">
       ${blocks.map((b, i) => this.renderBlock(b, m, maxCite, i))}
     </div>`;
@@ -2336,6 +2717,10 @@ export class SinglebaseChat extends LitElement {
       switch (seg.type) {
         case "bold":
           return html`<strong>${seg.text}</strong>`;
+        case "italic":
+          return html`<em>${seg.text}</em>`;
+        case "strike":
+          return html`<s>${seg.text}</s>`;
         case "code":
           return html`<code class="inline">${seg.text}</code>`;
         case "link":
@@ -2363,55 +2748,60 @@ export class SinglebaseChat extends LitElement {
       case "raw":
         return html`<p class="raw">${block.text}</p>`;
       case "h":
-        return html`<h3>${this.renderInline(block.text, m, maxCite)}</h3>`;
-      case "list": {
-        const items = block.items.map(
-          (item) => html`<li>${this.renderInline(item, m, maxCite)}</li>`
-        );
-        return block.ordered
-          ? html`<ol>
-              ${items}
-            </ol>`
-          : html`<ul>
-              ${items}
-            </ul>`;
-      }
+        return html`<h3 class="h${block.level}">${this.renderInline(block.text, m, maxCite)}</h3>`;
+      case "hr":
+        return html`<hr />`;
+      case "list":
+        return this.renderList(block.ordered, block.items, m, maxCite);
       case "quote":
         return html`<div class="quote">${this.renderInline(block.text, m, maxCite)}</div>`;
-      case "code": {
-        const key = `${m.key}:${index}`;
-        return html`<div class="code">
-          <div class="code-head">
-            <span class="label">${block.lang}</span>
-            <button type="button" class="text-btn" @click=${() => this.copy(key, block.text)}>
-              ${this.copiedKey === key ? this.msg.copied : this.msg.copy}
-            </button>
-          </div>
-          <pre><code>${block.text}</code></pre>
+      case "callout":
+        return html`<div class="callout ${block.kind}" role="note" part="callout">
+          <strong class="callout-title"
+            >${block.title || this.msg[CALLOUT_MESSAGE[block.kind]]}</strong
+          >
+          ${block.text
+            .split("\n")
+            .filter((line) => line.trim())
+            .map((line) => html`<p>${this.renderInline(line, m, maxCite)}</p>`)}
         </div>`;
-      }
+      case "code":
+        return (
+          this.renderCustom(block.lang, block.text, m) ??
+          this.renderCode(block.lang, block.text, `${m.key}:${index}`)
+        );
       case "table":
-        return html`<div class="table">
-          <table>
-            <thead>
-              <tr>
-                ${block.head.map((cell) => html`<th>${this.renderInline(cell, m, maxCite)}</th>`)}
-              </tr>
-            </thead>
-            <tbody>
-              ${block.rows.map(
-                (row) =>
-                  html`<tr>
-                    ${row.map((cell) => html`<td>${this.renderInline(cell, m, maxCite)}</td>`)}
-                  </tr>`
-              )}
-            </tbody>
-          </table>
+        return this.renderTable(
+          block.head,
+          block.rows,
+          block.align,
+          m,
+          maxCite,
+          `${m.key}:${index}`
+        );
+      case "json":
+        return this.renderJsonBlock(block.value, block.source, `${m.key}:${index}`);
+      case "svg": {
+        const url = svgDataUrl(block.source);
+        if (!url) return this.renderCode("svg", block.source, `${m.key}:${index}`);
+        const key = `${m.key}:${index}`;
+        return html`<figure class="svg" part="svg">
+          <img src=${url} alt="Drawing" />
+          <figcaption>
+            <button type="button" class="text-btn" @click=${() => this.copy(key, block.source)}>
+              ${this.copiedKey === key ? this.msg.copied : this.msg.copySvg}
+            </button>
+          </figcaption>
+        </figure>`;
+      }
+      case "pending":
+        return html`<div class="chart-pending">
+          <span class="label"
+            >${block.kind === "svg" ? this.msg.renderingSvg : this.msg.renderingChart}</span
+          >
         </div>`;
       case "chart":
         return this.renderChart(block.spec);
-      case "chartPending":
-        return html`<div class="chart-pending"><span class="label">Rendering chart</span></div>`;
       case "img":
         return html`<div class="gallery ${block.images.length > 1 ? "many" : ""}">
           ${block.images.map(
@@ -2434,6 +2824,180 @@ export class SinglebaseChat extends LitElement {
       default:
         return nothing;
     }
+  }
+
+  private renderList(ordered: boolean, items: ListItem[], m: ChatMessage, maxCite: number) {
+    const rows = items.map(
+      (item) =>
+        html`<li
+          class=${item.checked === null ? "" : "task"}
+          style=${item.depth ? `margin-left:${item.depth * 20}px` : ""}
+        >
+          ${
+            item.checked === null
+              ? nothing
+              : html`<input type="checkbox" disabled .checked=${item.checked} aria-hidden="true" />`
+          }
+          ${this.renderInline(item.text, m, maxCite)}
+        </li>`
+    );
+    return ordered
+      ? html`<ol>
+          ${rows}
+        </ol>`
+      : html`<ul>
+          ${rows}
+        </ul>`;
+  }
+
+  private renderCode(lang: string, text: string, key: string) {
+    return html`<div class="code">
+      <div class="code-head">
+        <span class="label">${lang}</span>
+        <button type="button" class="text-btn" @click=${() => this.copy(key, text)}>
+          ${this.copiedKey === key ? this.msg.copied : this.msg.copy}
+        </button>
+      </div>
+      <pre><code>${text}</code></pre>
+    </div>`;
+  }
+
+  /** A host renderer for this language, at the rich level only. */
+  private renderCustom(lang: string, text: string, m: ChatMessage): unknown {
+    const draw = this.formatLevel === "rich" ? this.renderers?.[lang] : undefined;
+    if (typeof draw !== "function" || m.phase === "streaming") return null;
+    try {
+      const out = draw(text, { lang, message: m });
+      return out === null || out === undefined
+        ? null
+        : html`<div class="custom-block">${out}</div>`;
+    } catch (error) {
+      console.warn(`[singlebase-chat] the "${lang}" renderer failed; showing the source`, error);
+      return null;
+    }
+  }
+
+  private renderTable(
+    head: string[],
+    rows: string[][],
+    align: (string | null)[],
+    m: ChatMessage,
+    maxCite: number,
+    key: string
+  ) {
+    const numeric = (value: string) =>
+      /^[-+]?[$€£¥]?\s?[\d,.]+\s?%?$/.test(value.trim()) && /\d/.test(value);
+    const toNumber = (value: string) => Number(value.replace(/[^\d.+-]/g, ""));
+    const alignOf = head.map((_, col) => {
+      if (align[col]) return align[col];
+      const cells = rows.map((r) => r[col] ?? "").filter(Boolean);
+      return cells.length && cells.filter(numeric).length / cells.length >= 0.8 ? "right" : null;
+    });
+
+    const sort = this.sorts.get(key);
+    let shown = rows;
+    if (sort) {
+      shown = [...rows].sort((a, b) => {
+        const x = a[sort.col] ?? "";
+        const y = b[sort.col] ?? "";
+        const diff =
+          numeric(x) && numeric(y)
+            ? toNumber(x) - toNumber(y)
+            : x.localeCompare(y, undefined, { numeric: true });
+        return diff * sort.dir;
+      });
+    }
+    const total = shown.length;
+    shown = shown.slice(0, MAX_TABLE_ROWS);
+
+    const sortBy = (col: number) => {
+      const next = new Map(this.sorts);
+      const current = next.get(key);
+      if (current?.col === col && current.dir === -1) next.delete(key);
+      else next.set(key, { col, dir: current?.col === col ? -1 : 1 });
+      this.sorts = next;
+    };
+    const style = (col: number) => (alignOf[col] ? `text-align:${alignOf[col]}` : "");
+
+    return html`<div class="table" part="table">
+      <table>
+        <thead>
+          <tr>
+            ${head.map((cell, col) => {
+              const state =
+                sort?.col === col ? (sort.dir === 1 ? "ascending" : "descending") : "none";
+              return html`<th style=${style(col)} aria-sort=${state}>
+                ${
+                  rows.length > 1
+                    ? html`<button type="button" class="sort" @click=${() => sortBy(col)}>
+                        ${this.renderInline(cell, m, maxCite)}<span class="arrow"
+                          >${state === "ascending" ? "↑" : state === "descending" ? "↓" : "↕"}</span
+                        >
+                      </button>`
+                    : this.renderInline(cell, m, maxCite)
+                }
+              </th>`;
+            })}
+          </tr>
+        </thead>
+        <tbody>
+          ${shown.map(
+            (row) =>
+              html`<tr>
+                ${head.map(
+                  (_, col) =>
+                    html`<td style=${style(col)}>
+                      ${this.renderInline(row[col] ?? "", m, maxCite)}
+                    </td>`
+                )}
+              </tr>`
+          )}
+        </tbody>
+      </table>
+      ${
+        total > shown.length
+          ? html`<div class="table-note">
+              ${fill(this.msg.showingRows, { n: shown.length, total })}
+            </div>`
+          : nothing
+      }
+    </div>`;
+  }
+
+  private renderJsonBlock(value: unknown, source: string, key: string) {
+    let nodes = 0;
+    const count = (v: unknown): void => {
+      nodes++;
+      if (nodes <= MAX_JSON_NODES && v && typeof v === "object") Object.values(v).forEach(count);
+    };
+    count(value);
+    if (nodes > MAX_JSON_NODES) return this.renderCode("json", source, key);
+
+    const node = (v: unknown, depth: number, name?: string): unknown => {
+      const label = name === undefined ? nothing : html`<span class="jkey">${name}</span>: `;
+      if (v && typeof v === "object") {
+        const entries = Object.entries(v);
+        const meta = Array.isArray(v) ? `[${entries.length}]` : `{${entries.length}}`;
+        return html`<details class="jnode" ?open=${depth < 2}>
+          <summary>${label}<span class="jmeta">${meta}</span></summary>
+          <div class="jkids">${entries.map(([k, child]) => node(child, depth + 1, k))}</div>
+        </details>`;
+      }
+      const type = v === null ? "null" : typeof v;
+      return html`<div class="jleaf">
+        ${label}<span class="jv ${type}">${JSON.stringify(v)}</span>
+      </div>`;
+    };
+
+    return html`<div class="code json" part="json">
+      <div class="code-head">
+        <span class="label">json</span>
+        <button type="button" class="text-btn" @click=${() => this.copy(key, source)}>
+          ${this.copiedKey === key ? this.msg.copied : this.msg.copy}
+        </button>
+      </div>
+      <div class="jtree">${node(value, 0)}</div>
+    </div>`;
   }
 
   private renderChart(spec: ChartSpec) {
@@ -2609,10 +3173,20 @@ export class SinglebaseChat extends LitElement {
     const placeholder =
       this.mode === "rag"
         ? msg.placeholderRag
-        : this.mode === "rich"
-          ? msg.placeholderRich
-          : fill(msg.placeholderChat, { name: this.assistantName });
+        : fill(msg.placeholderChat, { name: this.assistantName });
     const cantSend = !this.draft.trim();
+    const footnote =
+      this.footnote === ""
+        ? nothing
+        : html`<span class="footnote" part="footnote"
+            >${this.footnote ?? fill(msg.footnote, { name: this.assistantName })}</span
+          >`;
+    // Without a composer the chat is a reader: the conversation, and the footnote.
+    if (!this.showComposer) {
+      return html`<div class="composer-wrap reader">
+        <div class="composer-col">${footnote}</div>
+      </div>`;
+    }
     return html`<div class="composer-wrap">
       <div class="composer-col">
         <input
@@ -2703,7 +3277,7 @@ export class SinglebaseChat extends LitElement {
           </div>
           ${this.busy ? html`<div class="composer-ring"><div class="ring"></div></div>` : nothing}
         </div>
-        <span class="footnote">${fill(msg.footnote, { name: this.assistantName })}</span>
+        ${footnote}
       </div>
     </div>`;
   }

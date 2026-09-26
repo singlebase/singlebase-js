@@ -11,6 +11,8 @@ import { SinglebaseElementBase } from "./authui-base.js";
 import { resolveRedirectTarget } from "../utils/redirect.js";
 import { SettingsController } from "../controllers/settings-controller.js";
 import { EventBridge } from "../controllers/event-bridge.js";
+import { brandingStyles } from "../styles/branding.js";
+import { renderBranding } from "../utils/branding.js";
 import "./authui-account.js";
 import "./authui-buttons.js";
 
@@ -78,6 +80,7 @@ const flagAttr = {
 export class SinglebaseAuthScreen extends SinglebaseElementBase {
   static override styles = [
     ...SinglebaseElementBase.styles,
+    brandingStyles,
     css`
       /* the mock's root */
       :host {
@@ -87,7 +90,7 @@ export class SinglebaseAuthScreen extends SinglebaseElementBase {
         background: var(--sb-surface, #ffffff);
         color: var(--sb-ink, #16181a);
         border: 1px solid var(--sb-border, #e4e6e9);
-        border-radius: calc(var(--sb-radius, 4px) + 4px);
+        border-radius: calc((var(--sb-radius, 4px) + 4px) * var(--sb-radius-scale, 1));
         overflow: hidden;
       }
 
@@ -145,22 +148,6 @@ export class SinglebaseAuthScreen extends SinglebaseElementBase {
 
       .branding {
         margin-top: 18px;
-        text-align: center;
-        font-family: var(--sb-mono, "Geist Mono", ui-monospace, monospace);
-        font-size: 10.5px;
-        letter-spacing: 0.06em;
-        color: var(--sb-muted-ink, #61666c);
-      }
-
-      .branding a {
-        color: inherit;
-        text-decoration: none;
-      }
-
-      .branding a:hover {
-        color: var(--sb-ink, #16181a);
-        text-decoration: underline;
-        text-underline-offset: 3px;
       }
 
       /* the mock's panel */
@@ -242,6 +229,12 @@ export class SinglebaseAuthScreen extends SinglebaseElementBase {
    * thing that fails a security review, and deservedly.
    */
   @property({ converter: flagAttr, attribute: "branding" }) accessor branding = true;
+
+  /** The credit's text. Empty uses the element's default ("… by Singlebase"). */
+  @property({ attribute: "branding-text" }) accessor brandingText = "";
+
+  /** Where the credit links to. Only http(s); anything else uses singlebase.cloud. */
+  @property({ attribute: "branding-url" }) accessor brandingUrl = "";
 
   /**
    * Where to send the user once a session exists. Same-origin only — an
@@ -548,12 +541,12 @@ export class SinglebaseAuthScreen extends SinglebaseElementBase {
   }
 
   private renderBranding() {
-    if (!this.branding) return nothing;
-    return html`<div class="branding" part="branding">
-      <a href="https://singlebase.cloud" target="_blank" rel="noopener noreferrer"
-        >${this.msg.brandingLabel}</a
-      >
-    </div>`;
+    return renderBranding(
+      this.branding,
+      this.brandingText,
+      this.msg.brandingLabel,
+      this.brandingUrl
+    );
   }
 
   /** Every screen renders inside this, so the credit appears once and only once. */

@@ -16,6 +16,9 @@
       }
       body {
         margin: 0;
+        height: 100vh;
+        display: grid;
+        grid-template-columns: 300px minmax(0, 1fr);
         font:
           14px/1.5 "Geist",
           -apple-system,
@@ -28,26 +31,66 @@
         background: #0e0f11;
         color: #ecedee;
       }
-      .bar {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: 10px 18px;
-        min-height: 52px;
-        padding: 8px 20px;
-        background: #fff;
-        border-bottom: 1px solid #e4e6e9;
+      body.collapsed {
+        grid-template-columns: 0 minmax(0, 1fr);
       }
-      body.dark .bar {
+      body.collapsed .options {
+        visibility: hidden;
+      }
+
+      /* ── options panel ── */
+      .options {
+        overflow-y: auto;
+        background: #fff;
+        border-right: 1px solid #e4e6e9;
+        padding: 16px 16px 32px;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+        font-size: 12.5px;
+      }
+      body.dark .options {
         background: #141517;
         border-color: #2e3136;
       }
-      .bar b {
-        font-size: 13px;
-        margin-right: 6px;
+      .options h1 {
+        margin: 0;
+        font-size: 14px;
+      }
+      .options .lede {
+        margin: 4px 0 0;
+        color: #61666c;
+      }
+      fieldset {
+        border: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      legend {
+        padding: 0 0 6px;
+        font:
+          500 10.5px "Geist Mono",
+          ui-monospace,
+          monospace;
+        letter-spacing: 0.07em;
+        text-transform: uppercase;
+        color: #61666c;
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+      .row > span {
+        color: #61666c;
       }
       .seg {
         display: inline-flex;
+        flex-wrap: wrap;
         gap: 2px;
         padding: 2px;
         background: #f2f3f4;
@@ -58,9 +101,9 @@
       }
       .seg button {
         font: inherit;
-        font-size: 12.5px;
+        font-size: 12px;
         font-weight: 500;
-        padding: 4px 11px;
+        padding: 3px 8px;
         border: none;
         border-radius: 4px;
         background: transparent;
@@ -76,14 +119,124 @@
         background: #141517;
         color: #ecedee;
       }
-      .note {
-        font-size: 12px;
-        color: #61666c;
-        margin-left: auto;
+      .checks {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 6px 10px;
       }
+      .checks label {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        cursor: pointer;
+      }
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .field span {
+        color: #61666c;
+      }
+      .field input,
+      .field textarea {
+        font: inherit;
+        font-size: 12.5px;
+        padding: 6px 8px;
+        border: 1px solid #e4e6e9;
+        border-radius: 5px;
+        background: #fff;
+        color: inherit;
+        resize: vertical;
+      }
+      body.dark .field input,
+      body.dark .field textarea {
+        background: #1a1c1f;
+        border-color: #2e3136;
+      }
+      .swatches {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+      }
+      .swatches button {
+        width: 22px;
+        height: 22px;
+        border-radius: 999px;
+        border: 2px solid transparent;
+        cursor: pointer;
+        padding: 0;
+      }
+      .swatches button[aria-pressed="true"] {
+        border-color: #cdd1d6;
+        outline: 2px solid #16181a;
+        outline-offset: 1px;
+      }
+      .swatches input {
+        width: 28px;
+        height: 24px;
+        padding: 0;
+        border: none;
+        background: none;
+      }
+      .actions {
+        display: flex;
+        gap: 8px;
+      }
+      .actions button {
+        flex: 1;
+        font: inherit;
+        font-size: 12px;
+        font-weight: 500;
+        padding: 6px 8px;
+        border: 1px solid #e4e6e9;
+        border-radius: 5px;
+        background: transparent;
+        color: inherit;
+        cursor: pointer;
+      }
+      pre#markup {
+        margin: 0;
+        padding: 10px;
+        font:
+          11px/1.5 "Geist Mono",
+          ui-monospace,
+          monospace;
+        white-space: pre-wrap;
+        word-break: break-all;
+        background: #fafafa;
+        border: 1px solid #e4e6e9;
+        border-radius: 6px;
+      }
+      body.dark pre#markup {
+        background: #1a1c1f;
+        border-color: #2e3136;
+      }
+      .toggle-options {
+        position: fixed;
+        top: 10px;
+        left: 10px;
+        z-index: 5;
+        font: inherit;
+        font-size: 12px;
+        font-weight: 500;
+        padding: 4px 10px;
+        border: 1px solid #e4e6e9;
+        border-radius: 5px;
+        background: #fff;
+        color: #16181a;
+        cursor: pointer;
+        display: none;
+      }
+      body.collapsed .toggle-options {
+        display: block;
+      }
+
+      /* ── stage ── */
       #stage {
-        height: calc(100vh - 52px);
-        min-height: 560px;
+        min-width: 0;
+        height: 100vh;
+        overflow: auto;
       }
       #stage.page {
         display: flex;
@@ -139,37 +292,136 @@
       body.dark .filler span {
         background: #24272b;
       }
-      @media (max-width: 900px) {
+      @media (max-width: 1100px) {
         .inline-grid {
           grid-template-columns: minmax(0, 1fr);
+        }
+      }
+      @media (max-width: 700px) {
+        body {
+          grid-template-columns: minmax(0, 1fr);
+          grid-template-rows: auto minmax(0, 1fr);
+          height: auto;
+        }
+        .options {
+          border-right: none;
+          border-bottom: 1px solid #e4e6e9;
         }
       }
     </style>
   </head>
   <body>
-    <div class="bar">
-      <b>&lt;singlebase-chat&gt;</b>
-      <span class="seg" data-key="embed">
-        <button data-value="page">Full page</button>
-        <button data-value="inline">Inline</button>
-        <button data-value="launcher">Launcher</button>
-      </span>
-      <span class="seg" data-key="mode">
-        <button data-value="chat">Chat</button>
-        <button data-value="rag">RAG</button>
-        <button data-value="rich">Advanced</button>
-      </span>
-      <span class="seg" data-key="theme">
-        <button data-value="light">Light</button>
-        <button data-value="dark">Dark</button>
-      </span>
-      <span class="seg" data-key="glow">
-        <button data-value="subtle">Subtle</button>
-        <button data-value="vivid">Vivid</button>
-        <button data-value="off">Off</button>
-      </span>
-      <span class="note">Mock <code>llm</code> service — nothing leaves your machine.</span>
-    </div>
+    <aside class="options" aria-label="Options">
+      <div>
+        <h1>&lt;singlebase-chat&gt;</h1>
+        <p class="lede">Every option, applied live with <code>configure()</code>. Mock <code>llm</code> service — nothing leaves your machine.</p>
+      </div>
+
+      <fieldset>
+        <legend>Embed</legend>
+        <div class="row"><span>embed</span>
+          <span class="seg" data-key="embed">
+            <button data-value="page">page</button><button data-value="inline">inline</button><button data-value="launcher">launcher</button>
+          </span></div>
+        <div class="row"><span>sidebar</span>
+          <span class="seg" data-key="sidebar">
+            <button data-value="auto">auto</button><button data-value="open">open</button><button data-value="closed">closed</button><button data-value="none">none</button>
+          </span></div>
+        <div class="row"><span>position</span>
+          <span class="seg" data-key="position">
+            <button data-value="right">right</button><button data-value="left">left</button>
+          </span></div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Behaviour</legend>
+        <div class="row"><span>mode</span>
+          <span class="seg" data-key="mode">
+            <button data-value="chat">chat</button><button data-value="rag">rag</button>
+          </span></div>
+        <div class="row"><span>format</span>
+          <span class="seg" data-key="format">
+            <button data-value="raw">raw</button><button data-value="plain">plain</button><button data-value="advanced">advanced</button><button data-value="rich">rich</button>
+          </span></div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Look</legend>
+        <div class="row"><span>theme</span>
+          <span class="seg" data-key="theme">
+            <button data-value="light">light</button><button data-value="dark">dark</button>
+          </span></div>
+        <div class="row"><span>glow</span>
+          <span class="seg" data-key="glow">
+            <button data-value="subtle">subtle</button><button data-value="vivid">vivid</button><button data-value="off">off</button>
+          </span></div>
+        <div class="row"><span>radius</span>
+          <span class="seg" data-key="radius">
+            <button data-value="sharp">sharp</button><button data-value="default">default</button><button data-value="round">round</button>
+          </span></div>
+        <div class="row"><span>--sb-accent</span>
+          <span class="swatches" id="swatches">
+            <button data-color="" title="Default" style="background:conic-gradient(#16181a 0 50%, #f3f4f5 0)"></button>
+            <button data-color="#2f4bdb" style="background:#2f4bdb" title="#2f4bdb"></button>
+            <button data-color="#0f6b4a" style="background:#0f6b4a" title="#0f6b4a"></button>
+            <button data-color="#b4231a" style="background:#b4231a" title="#b4231a"></button>
+            <input type="color" id="accent-picker" title="Custom" value="#7c3aed" />
+          </span></div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Features</legend>
+        <div class="checks" id="checks">
+          <label><input type="checkbox" data-key="showTitle" /> show-title</label>
+          <label><input type="checkbox" data-key="allowUpload" /> allow-upload</label>
+          <label><input type="checkbox" data-key="allowExport" /> allow-export</label>
+          <label><input type="checkbox" data-key="allowRaw" /> allow-raw</label>
+          <label><input type="checkbox" data-key="allowCopy" /> allow-copy</label>
+          <label><input type="checkbox" data-key="allowRegenerate" /> allow-regenerate</label>
+          <label><input type="checkbox" data-key="allowBookmark" /> allow-bookmark</label>
+          <label><input type="checkbox" data-key="allowDelete" /> allow-delete</label>
+          <label><input type="checkbox" data-key="allowRename" /> allow-rename</label>
+          <label><input type="checkbox" data-key="allowFeedback" /> allow-feedback</label>
+          <label><input type="checkbox" data-key="showTime" /> show-time</label>
+          <label><input type="checkbox" data-key="showComposer" /> show-composer</label>
+          <label><input type="checkbox" data-key="branding" /> branding</label>
+          <label><input type="checkbox" data-key="followups" /> followups</label>
+          <label><input type="checkbox" data-key="showFollowups" /> show-followups</label>
+          <label><input type="checkbox" data-key="allowSearch" /> allow-search</label>
+          <label><input type="checkbox" data-key="showSources" /> show-sources</label>
+          <label><input type="checkbox" data-key="showNewChat" /> show-new-chat</label>
+          <label><input type="checkbox" data-key="showBookmarked" /> show-bookmarked</label>
+          <label><input type="checkbox" data-key="autoTitle" /> auto-title</label>
+          <label><input type="checkbox" data-key="greetingBubble" /> greeting-bubble</label>
+          <label><input type="checkbox" data-key="unreadBadge" /> unread-badge</label>
+        </div>
+      </fieldset>
+
+      <fieldset id="texts">
+        <legend>Content</legend>
+        <label class="field"><span>assistant-name</span><input data-key="assistantName" /></label>
+        <label class="field"><span>eyebrow <small>(empty hides it)</small></span><input data-key="eyebrow" placeholder="Per-mode default" /></label>
+        <label class="field"><span>heading</span><input data-key="heading" placeholder="Per-mode default" /></label>
+        <label class="field"><span>description</span><input data-key="description" placeholder="Per-mode default" /></label>
+        <label class="field"><span>prompts <small>(| separated)</small></span><textarea rows="2" data-key="prompts" placeholder="Per-mode defaults · none hides them"></textarea></label>
+        <label class="field"><span>logo-url</span><input data-key="logoUrl" placeholder="https://…" /></label>
+        <label class="field"><span>bubble-text</span><input data-key="bubbleText" /></label>
+        <label class="field"><span>footnote <small>(empty hides it)</small></span><input data-key="footnote" /></label>
+        <label class="field"><span>branding-text</span><input data-key="brandingText" placeholder="Chat by Singlebase" /></label>
+        <label class="field"><span>branding-url</span><input data-key="brandingUrl" placeholder="https://singlebase.cloud" /></label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Markup</legend>
+        <pre id="markup"></pre>
+        <div class="actions">
+          <button type="button" id="copy">Copy</button>
+          <button type="button" id="reset">Reset</button>
+          <button type="button" id="hide">Hide panel</button>
+        </div>
+      </fieldset>
+    </aside>
+    <button type="button" class="toggle-options" id="show">Options</button>
     <div id="stage"></div>
 
     <script type="module">
@@ -230,7 +482,7 @@
               "FOLLOWUPS: What happens after 5 wrong codes? | How do I change the SSO timeout? | Are codes case-sensitive?"
           };
         }
-        if (mode === "rich") {
+        if (mode === "data" || (mode !== "rag" && /chart|sign-?in|trend|data|breakdown/i.test(text))) {
           return {
             content:
               "Email code sign-ins grew **59%** in six weeks and are close to overtaking passwords, which fell **14%**.\n\n" +
@@ -254,12 +506,23 @@
               "FOLLOWUPS: Which method fails most? | Show only the weekly total | Compare Google and GitHub"
           };
         }
+        // Anything else shows off every block the chat can draw. Switch "format"
+        // to watch each level draw it, or fall back.
         return {
-          content:
-            "## A quick answer\n\nYou asked: “" + text + "”. Here's a **sample** reply with a code block:\n\n" +
-            "```js\nexport function debounce(fn, ms = 200) {\n  let t;\n  return (...args) => {\n    clearTimeout(t);\n    t = setTimeout(() => fn(...args), ms);\n  };\n}\n```\n\n" +
-            "- Works with any function\n- Keeps the latest arguments\n\n" +
-            "FOLLOWUPS: Add a leading-edge option | Write it in TypeScript | Add a cancel method"
+          content: [
+            "## A formatting tour",
+            "You asked: “" + text + "”. This is **bold**, *italic*, ~~struck~~, `code`, and a link to https://singlebase.cloud.",
+            "- [x] Parse the reply\n- [ ] Render every block\n  - nested items indent\n  - like this",
+            "> [!TIP]\n> Callouts, charts, images and custom blocks need `format=\"rich\"`.",
+            "| Plan | Seats | Price |\n|:--|--:|--:|\n| Starter | 5 | $0 |\n| Team | 25 | $99 |\n| Business | 100 | $349 |",
+            "```csv\nregion,signups,conversion\nNorth America,1204,4.2%\nEurope,988,3.9%\nAsia,1532,5.1%\n```",
+            '```json\n{ "user": { "id": "u_91", "roles": ["admin", "editor"], "active": true }, "quota": null }\n```',
+            '```svg\n<svg viewBox="0 0 220 90" xmlns="http://www.w3.org/2000/svg" font-family="sans-serif" font-size="11">\n  <rect x="4" y="30" width="60" height="30" rx="6" fill="#eef2ff" stroke="#4f46e5"/>\n  <text x="34" y="49" text-anchor="middle">Client</text>\n  <path d="M64 45 H150" stroke="#4f46e5" stroke-width="2" marker-end="url(#a)"/>\n  <rect x="152" y="30" width="64" height="30" rx="6" fill="#ecfdf5" stroke="#059669"/>\n  <text x="184" y="49" text-anchor="middle">API</text>\n  <defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L10 5 L0 10z" fill="#4f46e5"/></marker></defs>\n</svg>\n```',
+            chart({ type: "bar", title: "Signups by region", labels: ["North America", "Europe", "Asia"], series: [{ name: "Signups", values: [1204, 988, 1532] }] }),
+            '```order\n{ "id": "A-1042", "status": "Shipped", "total": "$129.00" }\n```',
+            "```js\nexport const debounce = (fn, ms = 200) => {\n  let t;\n  return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };\n};\n```",
+            "FOLLOWUPS: Show me sign-in data as a chart | What does plain drop? | Add another table"
+          ].join("\n\n")
         };
       }
 
@@ -272,7 +535,7 @@
         ]
       };
       for (const c of store.chats) {
-        const reply = answer(c._id === "c1" ? "rich" : c._id === "c3" ? "chat" : "rag", c.title);
+        const reply = answer(c._id === "c1" ? "data" : c._id === "c3" ? "chat" : "rag", c.title);
         c.messages = [
           { _id: id(), role: "system", content: "hidden" },
           { _id: id(), role: "user", content: c.title, _created_at: c._modified_at },
@@ -330,32 +593,142 @@
         }
       };
 
-      // ── the switches ──
-      const state = { embed: "page", mode: "chat", theme: "light", glow: "subtle" };
+      // ── the options ──
+      const DEFAULTS = {
+        embed: "page",
+        sidebar: "auto",
+        position: "right",
+        mode: "chat",
+        format: "rich",
+        theme: "light",
+        glow: "subtle",
+        radius: "default",
+        accent: "",
+        showTitle: true,
+        allowUpload: true,
+        allowExport: true,
+        allowRaw: true,
+        allowCopy: true,
+        allowRegenerate: true,
+        allowBookmark: true,
+        allowDelete: true,
+        allowRename: true,
+        allowFeedback: true,
+        showTime: true,
+        showComposer: true,
+        branding: true,
+        followups: true,
+        showFollowups: true,
+        allowSearch: true,
+        showSources: true,
+        showNewChat: true,
+        showBookmarked: true,
+        autoTitle: true,
+        greetingBubble: true,
+        unreadBadge: true,
+        assistantName: "Acme Assistant",
+        eyebrow: undefined,
+        heading: "",
+        description: "",
+        prompts: "",
+        logoUrl: "",
+        bubbleText: "Hi, questions about sign-in or the API? Ask me here.",
+        footnote: "Acme Assistant can make mistakes. Check important details.",
+        brandingText: "",
+        brandingUrl: ""
+      };
+      const state = { ...DEFAULTS };
       const stage = document.getElementById("stage");
+      const kebab = (key) => key.replace(/[A-Z]/g, (c) => "-" + c.toLowerCase());
 
-      function render() {
-        currentMode = state.mode;
+      /** Text colour that stays readable on the chosen accent. */
+      function onAccent(hex) {
+        const n = parseInt(hex.replace("#", ""), 16);
+        const lum = (0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255;
+        return lum > 0.6 ? "#16181a" : "#ffffff";
+      }
+
+      /** The attributes that differ from the element's own defaults. */
+      function markup() {
+        const ELEMENT_DEFAULTS = { ...DEFAULTS, format: "advanced", allowRaw: false, footnote: undefined, greetingBubble: false, unreadBadge: false, assistantName: "Assistant", bubbleText: "" };
+        const attrs = [];
+        for (const [key, value] of Object.entries(state)) {
+          if (key === "accent" || value === ELEMENT_DEFAULTS[key]) continue;
+          const name = kebab(key);
+          if (value === true) attrs.push(name);
+          else if (value === false) attrs.push(`${name}="false"`);
+          else attrs.push(`${name}="${String(value).replace(/"/g, "&quot;")}"`);
+        }
+        if (state.accent) attrs.push(`style="--sb-accent: ${state.accent}; --sb-on-accent: ${onAccent(state.accent)}"`);
+        return `<singlebase-chat${attrs.length ? "\n  " + attrs.join("\n  ") : ""}\n></singlebase-chat>`;
+      }
+
+      function syncControls() {
         document.body.classList.toggle("dark", state.theme === "dark");
         for (const seg of document.querySelectorAll(".seg")) {
           for (const b of seg.querySelectorAll("button")) {
             b.setAttribute("aria-pressed", String(state[seg.dataset.key] === b.dataset.value));
           }
         }
+        for (const box of document.querySelectorAll("#checks input")) box.checked = !!state[box.dataset.key];
+        for (const field of document.querySelectorAll("#texts [data-key]")) field.value = state[field.dataset.key] ?? "";
+        for (const b of document.querySelectorAll("#swatches button")) {
+          b.setAttribute("aria-pressed", String(b.dataset.color === state.accent));
+        }
+        document.getElementById("markup").textContent = markup();
+      }
 
-        const chat = document.createElement("singlebase-chat");
-        chat.client = mockClient;
-        chat.config = {
-          embed: state.embed,
-          mode: state.mode,
-          theme: state.theme,
-          glow: state.glow,
-          assistantName: "Acme Assistant",
-          greetingBubble: true,
-          unreadBadge: true,
-          bubbleText: "Hi, questions about sign-in or the API? Ask me here."
-        };
-        for (const name of ["send", "response", "title", "error", "feedback", "export", "delete"]) {
+      let chat = null;
+
+      /** Accent colour lives in CSS tokens, not in config. */
+      function applyAccent(el) {
+        el.style.removeProperty("--sb-accent");
+        el.style.removeProperty("--sb-on-accent");
+        if (state.accent) {
+          el.style.setProperty("--sb-accent", state.accent);
+          el.style.setProperty("--sb-on-accent", onAccent(state.accent));
+        }
+      }
+
+      /**
+       * Any option except the embed type changes the live element with
+       * configure(), so the conversation stays. Only a new embed rebuilds it.
+       */
+      function render() {
+        currentMode = state.mode;
+        syncControls();
+        const { accent, ...options } = state;
+
+        if (chat && chat.embed === state.embed) {
+          chat.configure(options);
+          applyAccent(chat);
+          return;
+        }
+
+        chat = document.createElement("singlebase-chat");
+        chat.configure({
+          ...options,
+          client: mockClient,
+          // A host block: the model writes ```order {…}``` and the page draws it.
+          renderers: {
+            order: (source) => {
+              const o = JSON.parse(source);
+              const card = document.createElement("div");
+              card.style.cssText = "display:flex;justify-content:space-between;gap:12px;padding:12px 14px;border:1px solid #cdd1d6;border-radius:8px;font-size:13px";
+              card.innerHTML = "<strong></strong><span></span>";
+              card.firstChild.textContent = "Order " + o.id + " · " + o.status;
+              card.lastChild.textContent = o.total;
+              return card;
+            }
+          }
+        });
+        applyAccent(chat);
+        // Your own content at the bottom of the chat list.
+        const extra = document.createElement("div");
+        extra.slot = "sidebar";
+        extra.innerHTML = '<div style="display:flex;justify-content:space-between;gap:8px"><span>Plan: <strong>Pro</strong></span><a href="#usage" style="color:inherit">Usage</a></div>';
+        chat.append(extra);
+        for (const name of ["send", "response", "title", "error", "feedback", "export", "delete", "bookmark"]) {
           chat.addEventListener(`singlebase-chat-${name}`, (e) => console.log(name, e.detail));
         }
 
@@ -382,14 +755,30 @@
         }
       }
 
+      const set = (key, value) => {
+        state[key] = value;
+        render();
+      };
       for (const seg of document.querySelectorAll(".seg")) {
         seg.addEventListener("click", (e) => {
           const value = e.target.closest("button")?.dataset.value;
-          if (!value) return;
-          state[seg.dataset.key] = value;
-          render();
+          if (value) set(seg.dataset.key, value);
         });
       }
+      document.getElementById("checks").addEventListener("change", (e) => set(e.target.dataset.key, e.target.checked));
+      document.getElementById("texts").addEventListener("change", (e) => set(e.target.dataset.key, e.target.value));
+      document.getElementById("swatches").addEventListener("click", (e) => {
+        const b = e.target.closest("button");
+        if (b) set("accent", b.dataset.color);
+      });
+      document.getElementById("accent-picker").addEventListener("change", (e) => set("accent", e.target.value));
+      document.getElementById("copy").addEventListener("click", () => navigator.clipboard?.writeText(markup()));
+      document.getElementById("reset").addEventListener("click", () => {
+        Object.assign(state, DEFAULTS);
+        render();
+      });
+      document.getElementById("hide").addEventListener("click", () => document.body.classList.add("collapsed"));
+      document.getElementById("show").addEventListener("click", () => document.body.classList.remove("collapsed"));
       render();
     </script>
   </body>

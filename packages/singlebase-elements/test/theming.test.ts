@@ -20,6 +20,25 @@ describe("theming attributes", () => {
     expect(el.getAttribute("field-style")).to.equal("underline");
   });
 
+  it("radius scales the auth widget's corners, and the property reflects", async () => {
+    const { el } = await mountWidget({ radius: "round" });
+    expect(el.getAttribute("radius")).to.equal("round");
+    const input = el.shadowRoot!.querySelector('input[type="email"]')!;
+    // --sb-radius 4px × 1.8
+    expect(getComputedStyle(input).borderTopLeftRadius).to.equal("7.2px");
+  });
+
+  it("radius on the uploader scales its card", async () => {
+    await import("../src/elements/uploader.js");
+    const el = await fixture<HTMLElement>(
+      html`<singlebase-uploader radius="sharp"></singlebase-uploader>`
+    );
+    await (el as any).updateComplete;
+    const card = el.shadowRoot!.querySelector(".card")!;
+    // (4px + 4px) × 0.35
+    expect(getComputedStyle(card).borderTopLeftRadius).to.equal("2.8px");
+  });
+
   it("underline strips the box off ordinary inputs", async () => {
     const { el } = await mountWidget({ fieldStyle: "underline" });
     const input = el.shadowRoot!.querySelector('input[type="email"]');

@@ -190,13 +190,15 @@ forms. `redirect-url` navigates once every file succeeds (same-origin only).
 | `heading` / `description` | — | Card copy |
 | `logo-url` / `logo-text` | — | Your mark |
 | `branding` | on | The "Files by Singlebase" credit. It makes no request |
-| `theme` / `density` | — | As in [AuthUI theming](./SBC-AUTHUI.md#theming) |
+| `branding-text` / `branding-url` | — | The credit's text and link (http(s) only). Same on every Singlebase element |
+| `theme` / `density` / `radius` | — | As in [AuthUI theming](./SBC-AUTHUI.md#theming) |
 
 ### Properties and methods
 
 | | |
 | --- | --- |
 | `client` | The client to upload with. Defaults to the page's `SinglebaseClient()` |
+| `configure(options)` | Change any settings on the fly; staged files stay. Returns the element |
 | `config` | Several settings at once |
 | `messages` | Override any copy (`defaultUploadMessages` lists the keys) |
 | `files` | The staged list: `name`, `status`, `percent`, `pages`, `encrypted`, `preview`, `record` |

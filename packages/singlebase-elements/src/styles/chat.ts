@@ -40,7 +40,7 @@ export const chatStyles = css`
     --c-danger: var(--sb-danger, #b4231a);
     --c-ok: var(--sb-ok, #0f6b4a);
     --c-mono: var(--sb-mono, "Geist Mono", ui-monospace, monospace);
-    --c-r: var(--sb-radius, 4px);
+    --c-r: calc(var(--sb-radius, 4px) * var(--sb-radius-scale, 1));
     --c-r2: calc(var(--c-r) * 1.5);
     --c-r3: calc(var(--c-r) * 2);
     --c-r4: calc(var(--c-r) * 3);
@@ -485,6 +485,17 @@ export const chatStyles = css`
     outline: none;
   }
 
+  .side-extra {
+    display: none;
+  }
+
+  .side-extra.filled {
+    display: block;
+    padding: 12px 16px;
+    border-top: 1px solid var(--c-line);
+    font-size: 12.5px;
+  }
+
   .side-note {
     font-size: 12.5px;
     color: var(--c-muted);
@@ -656,6 +667,21 @@ export const chatStyles = css`
   }
 
   /* ── welcome ──────────────────────────────────────────── */
+
+  .welcome-slot {
+    min-height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  ::slotted([slot="welcome"]) {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 28px 18px;
+  }
 
   .welcome {
     max-width: 640px;
@@ -1051,6 +1077,168 @@ export const chatStyles = css`
     background: var(--c-hover);
     border-radius: calc(var(--c-r) * 0.75);
     padding: 1px 5px;
+  }
+
+  .answer h3.h1 {
+    font-size: 18px;
+  }
+
+  .answer h3.h2 {
+    font-size: 16.5px;
+  }
+
+  .answer h3.h4 {
+    font-size: 14.5px;
+  }
+
+  .answer hr {
+    width: 100%;
+    border: none;
+    border-top: 1px solid var(--c-line);
+    margin: 4px 0;
+  }
+
+  .answer li.task {
+    list-style: none;
+    margin-left: -18px;
+  }
+
+  .answer li.task input {
+    margin: 0 6px 0 0;
+    vertical-align: -1px;
+    accent-color: var(--c-brand);
+  }
+
+  .callout {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 13.5px;
+    line-height: 1.6;
+    padding: 10px 14px;
+    border: 1px solid var(--c-line);
+    border-left: 3px solid var(--callout, var(--c-ink));
+    border-radius: var(--c-r2);
+    background: color-mix(in srgb, var(--callout, var(--c-ink)) 7%, var(--c-bg));
+  }
+
+  .callout-title {
+    font-weight: 600;
+    color: var(--callout, var(--c-ink));
+  }
+
+  .callout.note {
+    --callout: oklch(0.55 0.15 255);
+  }
+
+  .callout.tip {
+    --callout: oklch(0.55 0.12 160);
+  }
+
+  .callout.important {
+    --callout: oklch(0.52 0.17 300);
+  }
+
+  .callout.warning {
+    --callout: oklch(0.6 0.14 70);
+  }
+
+  .callout.caution {
+    --callout: var(--c-danger);
+  }
+
+  .jtree {
+    padding: 10px 14px;
+    overflow-x: auto;
+    font-family: var(--c-mono);
+    font-size: 12.5px;
+    line-height: 1.7;
+  }
+
+  .jtree summary {
+    cursor: pointer;
+    list-style-position: outside;
+  }
+
+  .jkids {
+    padding-left: 16px;
+    border-left: 1px solid var(--c-line);
+    margin-left: 4px;
+  }
+
+  .jkey {
+    color: var(--c-ink2);
+  }
+
+  .jmeta {
+    color: var(--c-muted);
+  }
+
+  .jv.string {
+    color: oklch(0.52 0.12 160);
+  }
+
+  .jv.number {
+    color: oklch(0.55 0.15 255);
+  }
+
+  .jv.boolean,
+  .jv.null {
+    color: oklch(0.52 0.17 300);
+  }
+
+  .table th button.sort {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font: inherit;
+    color: inherit;
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+  }
+
+  .table th .arrow {
+    font-size: 10px;
+    opacity: 0.5;
+  }
+
+  .table th[aria-sort="ascending"] .arrow,
+  .table th[aria-sort="descending"] .arrow {
+    opacity: 1;
+  }
+
+  .table-note {
+    padding: 7px 12px;
+    font-size: 12px;
+    color: var(--c-muted);
+    border-top: 1px solid var(--c-line2);
+    background: var(--c-bg2);
+  }
+
+  figure.svg {
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    align-items: flex-start;
+  }
+
+  figure.svg img {
+    display: block;
+    width: min(100%, 480px);
+    height: auto;
+    max-height: 420px;
+    object-fit: contain;
+    padding: 12px;
+    border: 1px solid var(--c-line);
+    border-radius: var(--c-r2);
+    background: #ffffff;
+  }
+
+  .custom-block {
+    min-width: 0;
   }
 
   .quote {
@@ -1710,6 +1898,10 @@ export const chatStyles = css`
     padding: 0 12px 12px;
   }
 
+  .composer-wrap.reader {
+    padding-top: 10px;
+  }
+
   .composer-col {
     max-width: 760px;
     margin: 0 auto;
@@ -1894,8 +2086,7 @@ export const chatStyles = css`
     color: var(--c-danger);
   }
 
-  .footnote,
-  .branding {
+  .footnote {
     text-align: center;
     font-size: 11.5px;
     color: var(--c-muted);
@@ -1904,19 +2095,6 @@ export const chatStyles = css`
   .branding {
     padding: 0 12px 10px;
     margin-top: -4px;
-  }
-
-  .branding a {
-    font-family: var(--c-mono);
-    font-size: 10.5px;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--c-muted);
-    text-decoration: none;
-  }
-
-  .branding a:hover {
-    color: var(--c-ink);
   }
 
   .toast {

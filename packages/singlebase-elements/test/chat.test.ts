@@ -1,5 +1,6 @@
 import { fixture, html, expect, aTimeout } from "@open-wc/testing";
 import "../src/elements/chat.js";
+import "../src/elements/uploader.js";
 import type { SinglebaseChat } from "../src/elements/chat.js";
 
 type Call = { method: string; payload: any };
@@ -288,44 +289,137 @@ describe("<singlebase-chat> sources", () => {
   });
 });
 
-describe("<singlebase-chat> render-as", () => {
-  const reply =
-    'Lead.\n\n```chart\n{"type":"bar","title":"Share","labels":["A","B"],"series":[{"name":"n","values":[3,1]}]}\n```';
+describe("<singlebase-chat> format levels", () => {
+  const reply = [
+    "Lead.",
+    '```chart\n{"type":"bar","title":"Share","labels":["A","B"],"series":[{"name":"n","values":[3,1]}]}\n```',
+    "> [!TIP]\n> Sort by clicking a header.",
+    "| Name | Qty |\n|---|---|\n| b | 10 |\n| a | 9 |",
+    '```json\n{"ok":true}\n```',
+    '```svg\n<svg viewBox="0 0 10 10"><circle cx="5" cy="5" r="4"/></svg>\n```',
+    '```order\n{"id":"A-1"}\n```'
+  ].join("\n\n");
   const client = () =>
     llmClient({
       chat: () => ({ _id: "c1", message: { _id: "a1", reply_to: "u1", content: reply } })
     });
-
-  it("rich draws the chart", async () => {
-    const el = await mount(html`<singlebase-chat auto-title="false"></singlebase-chat>`, client());
-    await el.send("chart");
+  const open = async (level?: string) => {
+    const el = await mount(
+      level
+        ? html`<singlebase-chat format=${level} auto-title="false"></singlebase-chat>`
+        : html`<singlebase-chat auto-title="false"></singlebase-chat>`,
+      client()
+    );
+    el.renderers = { order: (source) => html`<b class="order">Order ${JSON.parse(source).id}</b>` };
+    await el.send("show me");
     await until(settled(el));
     await el.updateComplete;
+    return el;
+  };
+
+  it("rich draws everything, including the host's own blocks", async () => {
+    const el = await open("rich");
     expect($$(el, ".bar-row")).to.have.length(2);
+    expect($(el, ".callout.tip .callout-title")!.textContent!.trim()).to.equal("Tip");
+    expect($(el, ".jtree")).to.exist;
+    expect($(el, "figure.svg img")!.getAttribute("src")!.startsWith("data:image/svg+xml")).to.equal(
+      true
+    );
+    expect($(el, ".custom-block .order")!.textContent).to.equal("Order A-1");
   });
 
-  it("markdown shows the chart as a table", async () => {
-    const el = await mount(
-      html`<singlebase-chat render-as="markdown" auto-title="false"></singlebase-chat>`,
-      client()
-    );
-    await el.send("chart");
-    await until(settled(el));
-    await el.updateComplete;
+  it("advanced (the default) keeps tables, json and svg, but not charts, callouts or host blocks", async () => {
+    const el = await open();
+    expect(el.format).to.equal("advanced");
     expect($(el, ".bar-row")).to.equal(null);
-    expect($$(el, ".answer td").map((td) => td.textContent)).to.deep.equal(["A", "3", "B", "1"]);
+    expect($(el, ".callout")).to.equal(null);
+    expect($(el, ".quote")!.textContent).to.contain("Tip");
+    expect($(el, ".jtree")).to.exist;
+    expect($(el, "figure.svg")).to.exist;
+    expect($(el, ".custom-block")).to.equal(null);
+    expect($$(el, ".code .label").map((l) => l.textContent)).to.include("order");
   });
 
-  it("text shows one plain block", async () => {
+  it("plain shows text only", async () => {
+    const el = await open("plain");
+    expect($(el, "table")).to.equal(null);
+    expect($(el, ".jtree")).to.equal(null);
+    expect($(el, "figure.svg")).to.equal(null);
+    expect($(el, ".answer .raw")!.textContent).to.contain("A  ·  3");
+  });
+
+  it("allow-raw adds a per-reply toggle to the text as written", async () => {
+    const c = llmClient({
+      chat: () => ({ _id: "c1", message: { _id: "a1", reply_to: "u1", content: "Hi **there**" } })
+    });
+    const plain = await mount(html`<singlebase-chat auto-title="false"></singlebase-chat>`, c);
+    await plain.send("x");
+    await until(settled(plain));
+    await plain.updateComplete;
+    expect($(plain, 'button[aria-label="View raw"]')).to.equal(null); // off by default
+
     const el = await mount(
-      html`<singlebase-chat render-as="text" auto-title="false"></singlebase-chat>`,
-      client()
+      html`<singlebase-chat allow-raw auto-title="false"></singlebase-chat>`,
+      c
     );
-    await el.send("chart");
+    await el.send("x");
     await until(settled(el));
     await el.updateComplete;
-    expect($(el, ".answer .raw")!.textContent).to.contain("A  ·  3");
-    expect($(el, ".chart")).to.equal(null);
+    const toggle = $(el, 'button[aria-label="View raw"]') as HTMLButtonElement;
+    toggle.click();
+    await el.updateComplete;
+    expect($(el, ".answer .raw")!.textContent).to.equal("Hi **there**");
+    expect(toggle.getAttribute("aria-pressed")).to.equal("true");
+    toggle.click();
+    await el.updateComplete;
+    expect($(el, ".answer strong")!.textContent).to.equal("there");
+  });
+
+  it("raw shows the reply exactly as written", async () => {
+    const el = await open("raw");
+    const raw = $(el, ".answer .raw")!.textContent!;
+    expect(raw).to.contain("```chart");
+    expect(raw).to.contain("> [!TIP]");
+    expect($(el, "table")).to.equal(null);
+    expect($(el, ".cite")).to.equal(null);
+  });
+
+  it("sorts a table by a column, then reverses, then restores", async () => {
+    const el = await open("advanced");
+    const table = $$(el, ".table").find((t) => t.textContent!.includes("Qty"))!;
+    const first = () => table.querySelector("tbody td")!.textContent!.trim();
+    const header = () => table.querySelectorAll<HTMLButtonElement>("th button.sort")[1];
+
+    expect(first()).to.equal("b");
+    header().click();
+    await el.updateComplete;
+    expect(first()).to.equal("a"); // 9 before 10: numeric, not text
+    header().click();
+    await el.updateComplete;
+    expect(first()).to.equal("b");
+    header().click();
+    await el.updateComplete;
+    expect(first()).to.equal("b");
+    expect(table.querySelector("th[aria-sort=ascending], th[aria-sort=descending]")).to.equal(null);
+    // numbers right-align on their own
+    expect(table.querySelectorAll("td")[1].getAttribute("style")).to.contain("right");
+  });
+
+  it("tells the model what it may write, per level", async () => {
+    const payloads: any[] = [];
+    for (const level of ["plain", "rich"]) {
+      const c = llmClient();
+      const el = await mount(
+        html`<singlebase-chat format=${level} auto-title="false"></singlebase-chat>`,
+        c
+      );
+      await el.send("hi");
+      await until(settled(el));
+      payloads.push(c.calls.find((x) => x.method === "chat")!.payload.system_message);
+    }
+    expect(payloads[0]).to.contain("Don't use tables, charts");
+    expect(payloads[1]).to.contain('fenced "chart" block');
+    expect(payloads[1]).to.contain("[!NOTE]");
   });
 });
 
@@ -438,6 +532,76 @@ describe("<singlebase-chat> history", () => {
   });
 });
 
+describe("<singlebase-chat> sidebar and radius", () => {
+  it('sidebar="none" removes the list, its toggle and the list call', async () => {
+    const client = llmClient();
+    const el = await mount(
+      html`<singlebase-chat sidebar="none" auto-title="false"></singlebase-chat>`,
+      client
+    );
+    await aTimeout(50);
+    await el.updateComplete;
+
+    expect($(el, ".sidebar")).to.equal(null);
+    expect($(el, 'button[aria-label="Show chats"]')).to.equal(null);
+    expect(client.calls.some((c) => c.method === "list_chats")).to.equal(false);
+
+    // With no list, the header carries New chat.
+    await el.send("hi");
+    await until(settled(el));
+    await el.updateComplete;
+    ($(el, 'button[aria-label="New chat"]') as HTMLButtonElement).click();
+    await el.updateComplete;
+    expect(el.chatId).to.equal(null);
+    expect(el.thread).to.have.length(0);
+  });
+
+  it('sidebar="closed" starts closed but keeps the toggle', async () => {
+    const el = await mount(html`<singlebase-chat sidebar="closed"></singlebase-chat>`, llmClient());
+    await aTimeout(50);
+    await el.updateComplete;
+    expect($(el, ".sidebar")).to.equal(null);
+    ($(el, 'button[aria-label="Show chats"]') as HTMLButtonElement).click();
+    await el.updateComplete;
+    expect($(el, ".sidebar")).to.exist;
+  });
+
+  it("radius scales only the element that carries it", async () => {
+    const wrap = await fixture<HTMLDivElement>(
+      html`<div>
+        <singlebase-chat radius="round"></singlebase-chat>
+        <singlebase-uploader></singlebase-uploader>
+      </div>`
+    );
+    const chat = wrap.querySelector("singlebase-chat")!;
+    const uploader = wrap.querySelector("singlebase-uploader")!;
+    await chat.updateComplete;
+    const scale = (el: Element) =>
+      getComputedStyle(el).getPropertyValue("--sb-radius-scale").trim();
+    expect(scale(chat)).to.equal("1.8");
+    expect(scale(uploader)).to.equal("");
+    const composer = chat.shadowRoot!.querySelector(".composer")!;
+    // 4px × 1.8 × 2.25
+    expect(getComputedStyle(composer).borderTopLeftRadius).to.equal("16.2px");
+  });
+
+  it("a page-wide scale reaches every element without the attribute", async () => {
+    const wrap = await fixture<HTMLDivElement>(
+      html`<div style="--sb-radius-scale: 0.35">
+        <singlebase-chat></singlebase-chat>
+        <singlebase-chat radius="default"></singlebase-chat>
+      </div>`
+    );
+    const [inherits, own] = Array.from(wrap.querySelectorAll("singlebase-chat"));
+    await (inherits as any).updateComplete;
+    await (own as any).updateComplete;
+    const corner = (el: Element) =>
+      getComputedStyle(el.shadowRoot!.querySelector(".composer")!).borderTopLeftRadius;
+    expect(corner(inherits)).to.equal("3.15px");
+    expect(corner(own)).to.equal("9px");
+  });
+});
+
 describe("<singlebase-chat> embeds and config", () => {
   it("launcher opens and closes a dialog panel", async () => {
     const el = await mount(
@@ -482,17 +646,367 @@ describe("<singlebase-chat> embeds and config", () => {
   it("applies a config object and uses custom prompts", async () => {
     const el = await mount(html`<singlebase-chat></singlebase-chat>`, llmClient());
     el.config = {
-      mode: "rich",
+      mode: "rag",
       prompts: ["Chart my sales"],
       assistantName: "Ada",
       branding: false
     };
     await el.updateComplete;
 
-    expect(el.mode).to.equal("rich");
+    expect(el.mode).to.equal("rag");
     expect($$(el, ".prompt-text").map((p) => p.textContent)).to.deep.equal(["Chart my sales"]);
     expect($(el, ".branding")).to.equal(null);
     expect(el.config.assistantName).to.equal("Ada");
+  });
+
+  it("takes the client and a chat to open through config", async () => {
+    const client = llmClient({
+      get_chat: () => ({ _id: "c7", title: "From config", messages: [] })
+    });
+    const el = await fixture<SinglebaseChat>(html`<singlebase-chat></singlebase-chat>`);
+    el.config = {
+      client,
+      chatId: "c7",
+      format: "rich",
+      allowRaw: true,
+      sidebar: "none",
+      radius: "round"
+    };
+    await until(() => el.chatId === "c7" && !!$(el, ".title"));
+    await el.updateComplete;
+    expect($(el, ".title")!.textContent!.trim()).to.equal("From config");
+    expect(el.config).to.include({
+      chatId: "c7",
+      format: "rich",
+      allowRaw: true,
+      sidebar: "none",
+      radius: "round"
+    });
+    expect(el.config.client).to.equal(client);
+  });
+
+  it("configure() changes settings on the fly and keeps the conversation", async () => {
+    const el = await mount(
+      html`<singlebase-chat auto-title="false"></singlebase-chat>`,
+      llmClient()
+    );
+    await el.send("keep this");
+    await until(settled(el));
+
+    const returned = el.configure({ theme: "dark", format: "plain", sidebar: "none" });
+    await el.updateComplete;
+
+    expect(returned).to.equal(el);
+    expect(el.getAttribute("theme")).to.equal("dark");
+    expect(el.format).to.equal("plain");
+    expect($(el, 'button[aria-label="Show chats"]')).to.equal(null);
+    expect(el.thread[0].content).to.equal("keep this");
+    expect(el.mode).to.equal("chat"); // untouched keys stay
+  });
+
+  it("flags hide bookmark, delete, rename, feedback and times", async () => {
+    const el = await mount(
+      html`<singlebase-chat
+        auto-title="false"
+        allow-bookmark="false"
+        allow-delete="false"
+        allow-rename="false"
+        allow-feedback="false"
+        show-time="false"
+      ></singlebase-chat>`,
+      llmClient()
+    );
+    await el.send("hello");
+    await until(settled(el));
+    await el.updateComplete;
+
+    for (const label of [
+      "Bookmark chat",
+      "Delete chat",
+      "Bookmark message",
+      "Delete message",
+      "Helpful",
+      "Not helpful"
+    ]) {
+      expect($(el, `button[aria-label="${label}"]`), label).to.equal(null);
+    }
+    expect($(el, ".time")).to.equal(null);
+    expect(($(el, ".title") as HTMLButtonElement).disabled).to.equal(true);
+    // what's left still works
+    expect($(el, 'button[aria-label="Copy"]')).to.exist;
+  });
+
+  it("allow-copy and allow-regenerate hide their buttons", async () => {
+    const el = await mount(
+      html`<singlebase-chat
+        auto-title="false"
+        allow-copy="false"
+        allow-regenerate="false"
+      ></singlebase-chat>`,
+      llmClient()
+    );
+    await el.send("hello");
+    await until(settled(el));
+    await el.updateComplete;
+    expect($(el, 'button[aria-label="Copy"]')).to.equal(null);
+    expect($(el, 'button[aria-label="Regenerate"]')).to.equal(null);
+    expect($(el, 'button[aria-label="Bookmark message"]')).to.exist;
+  });
+
+  it("footnote takes custom text, and an empty string hides it", async () => {
+    const el = await mount(
+      html`<singlebase-chat footnote="Answers come from our docs."></singlebase-chat>`,
+      llmClient()
+    );
+    expect($(el, ".footnote")!.textContent!.trim()).to.equal("Answers come from our docs.");
+    el.configure({ footnote: "" });
+    await el.updateComplete;
+    expect($(el, ".footnote")).to.equal(null);
+    el.configure({ footnote: undefined as never });
+    await el.updateComplete;
+    expect($(el, ".footnote")!.textContent).to.contain("can make mistakes");
+  });
+
+  it("welcome: prompts none or [] hide the cards; eyebrow is custom or hidden", async () => {
+    const el = await mount(
+      html`<singlebase-chat prompts="none" eyebrow="Support"></singlebase-chat>`,
+      llmClient()
+    );
+    expect($(el, ".prompts")).to.equal(null);
+    expect($(el, ".welcome-head .label")!.textContent).to.equal("Support");
+
+    el.configure({ prompts: [], eyebrow: "" });
+    await el.updateComplete;
+    expect($(el, ".prompts")).to.equal(null);
+    expect($(el, ".welcome-head .label")).to.equal(null);
+
+    el.configure({ prompts: "", eyebrow: undefined as never });
+    await el.updateComplete;
+    expect($$(el, ".prompt")).to.have.length(4); // back to the mode's defaults
+    expect($(el, ".welcome-head .label")!.textContent).to.equal("Chat");
+  });
+
+  it("a welcome slot replaces the whole welcome screen", async () => {
+    const el = await mount(
+      html`<singlebase-chat
+        ><div slot="welcome"><h1>Hello from the page</h1></div></singlebase-chat
+      >`,
+      llmClient()
+    );
+    const slot = $(el, 'slot[name="welcome"]') as HTMLSlotElement;
+    expect(slot.assignedElements().map((e) => e.textContent)).to.deep.equal([
+      "Hello from the page"
+    ]);
+    // the built-in welcome is only fallback content, so it isn't shown
+    expect((slot.querySelector(".welcome") as HTMLElement).getClientRects().length).to.equal(0);
+
+    await el.send("hi");
+    await until(settled(el));
+    await el.updateComplete;
+    expect($(el, 'slot[name="welcome"]')).to.equal(null); // gone once the chat starts
+  });
+
+  it("show-composer=false shows a saved chat read-only", async () => {
+    const client = llmClient({
+      get_chat: () => ({
+        _id: "c9",
+        title: "Saved",
+        messages: [
+          { _id: "u", role: "user", content: "Hi" },
+          { _id: "a", role: "assistant", content: "Hello **there**" }
+        ]
+      })
+    });
+    const el = await mount(
+      html`<singlebase-chat chat-id="c9" show-composer="false"></singlebase-chat>`,
+      client
+    );
+    await until(() => el.thread.length === 2);
+    await el.updateComplete;
+    expect($(el, "textarea.input")).to.equal(null);
+    expect($(el, 'button[aria-label="Attach files"]')).to.equal(null);
+    expect($(el, ".answer strong")!.textContent).to.equal("there");
+    expect($(el, ".footnote")).to.exist;
+
+    el.configure({ showComposer: true });
+    await el.updateComplete;
+    expect($(el, "textarea.input")).to.exist;
+  });
+
+  it("followups asks the model; show-followups decides whether they're shown", async () => {
+    const c = llmClient();
+    const hidden = await mount(
+      html`<singlebase-chat show-followups="false" auto-title="false"></singlebase-chat>`,
+      c
+    );
+    await hidden.send("hi");
+    await until(settled(hidden));
+    await hidden.updateComplete;
+    expect(c.calls.find((x) => x.method === "chat")!.payload.system_message).to.contain(
+      "FOLLOWUPS:"
+    );
+    expect($(hidden, ".followups")).to.equal(null);
+    expect($(hidden, ".answer")!.textContent).not.to.contain("FOLLOWUPS"); // still stripped
+
+    hidden.configure({ showFollowups: true });
+    await hidden.updateComplete;
+    expect($$(hidden, ".followup")).to.have.length(3);
+
+    const c2 = llmClient();
+    const off = await mount(
+      html`<singlebase-chat followups="false" auto-title="false"></singlebase-chat>`,
+      c2
+    );
+    await off.send("hi");
+    await until(settled(off));
+    expect(c2.calls.find((x) => x.method === "chat")!.payload.system_message).not.to.contain(
+      "FOLLOWUPS:"
+    );
+  });
+
+  it("allow-search=false removes the chat list's search box", async () => {
+    const el = await mount(
+      html`<singlebase-chat sidebar allow-search="false"></singlebase-chat>`,
+      llmClient()
+    );
+    await aTimeout(50);
+    await el.updateComplete;
+    expect($(el, ".sidebar")).to.exist;
+    expect($(el, "input.search")).to.equal(null);
+  });
+
+  it("a sidebar slot adds your own content to the chat list", async () => {
+    const el = await mount(
+      html`<singlebase-chat sidebar
+        ><div slot="sidebar">Plan: Pro · <a href="/usage">Usage</a></div></singlebase-chat
+      >`,
+      llmClient()
+    );
+    await aTimeout(50);
+    await el.updateComplete;
+    const box = $(el, ".side-extra")!;
+    expect(box.classList.contains("filled")).to.equal(true);
+    const slot = box.querySelector("slot") as HTMLSlotElement;
+    expect(slot.assignedElements()[0].textContent).to.contain("Plan: Pro");
+
+    const bare = await mount(html`<singlebase-chat sidebar></singlebase-chat>`, llmClient());
+    await aTimeout(50);
+    await bare.updateComplete;
+    expect(getComputedStyle($(bare, ".side-extra")!).display).to.equal("none");
+  });
+
+  it("show-sources, show-new-chat and show-bookmarked hide their parts", async () => {
+    const now = new Date().toISOString();
+    const client = llmClient({
+      list_chats: () => ({
+        items: [{ _id: "c2", title: "Pinned", bookmarked: true, _modified_at: now }]
+      }),
+      chat: () => ({
+        _id: "c1",
+        message: {
+          _id: "a1",
+          reply_to: "u1",
+          content: "Fact [1].",
+          sources: [{ title: "Doc", content: "The fact." }]
+        }
+      })
+    });
+    const el = await mount(
+      html`<singlebase-chat
+        sidebar
+        auto-title="false"
+        show-sources="false"
+        show-new-chat="false"
+        show-bookmarked="false"
+      ></singlebase-chat>`,
+      client
+    );
+    await until(() => $$(el, ".thread-title").length === 1);
+    expect($(el, ".new-chat")).to.equal(null);
+    expect($$(el, ".group").map((g) => g.textContent)).to.deep.equal(["Today"]);
+
+    await el.send("q");
+    await until(settled(el));
+    await el.updateComplete;
+    expect($(el, ".source-card")).to.equal(null);
+    expect($(el, ".retrieval")).to.equal(null);
+    expect($(el, ".cite")).to.exist; // chips in the text stay
+
+    el.configure({ showSources: true, showNewChat: true, showBookmarked: true });
+    await el.updateComplete;
+    expect($(el, ".source-card")).to.exist;
+    expect($(el, ".new-chat")).to.exist;
+    expect($$(el, ".group").map((g) => g.textContent)[0]).to.equal("Bookmarked");
+  });
+
+  it("beforeSend can change the request, asynchronously", async () => {
+    const client = llmClient();
+    const el = await mount(html`<singlebase-chat auto-title="false"></singlebase-chat>`, client);
+    el.beforeSend = async (payload, { isNew }) => {
+      await aTimeout(5);
+      payload.metadata = { page: "/billing", isNew };
+      return { ...payload, message: String(payload.message).replace(/\d{4}-\d{4}/g, "[redacted]") };
+    };
+    await el.send("My card is 1234-5678");
+    await until(settled(el));
+    const sent = client.calls.find((c) => c.method === "chat")!.payload;
+    expect(sent.message).to.equal("My card is [redacted]");
+    expect(sent.metadata).to.deep.equal({ page: "/billing", isNew: true });
+  });
+
+  it("beforeSend returning false cancels and gives the text back", async () => {
+    const client = llmClient();
+    const el = await mount(html`<singlebase-chat></singlebase-chat>`, client);
+    el.beforeSend = () => false;
+    await el.send("never mind");
+    await el.updateComplete;
+    expect(client.calls.some((c) => c.method === "chat")).to.equal(false);
+    expect(el.thread).to.have.length(0);
+    expect(($(el, "textarea.input") as HTMLTextAreaElement).value).to.equal("never mind");
+  });
+
+  it("beforeSend that forgets to return never sends the original", async () => {
+    const client = llmClient();
+    const el = await mount(html`<singlebase-chat></singlebase-chat>`, client);
+    const errors: any[] = [];
+    el.addEventListener("singlebase-chat-error", (e) => errors.push((e as CustomEvent).detail));
+    el.beforeSend = ((payload: any) => {
+      delete payload.metadata; // mutates, but no return
+    }) as never;
+    await el.send("secret");
+    await el.updateComplete;
+    expect(client.calls.some((c) => c.method === "chat")).to.equal(false);
+    expect(errors[0].code).to.equal("BEFORE_SEND_INVALID");
+    expect($(el, ".error-card")).to.exist;
+  });
+
+  it("afterParse rewrites the parsed blocks before drawing", async () => {
+    const client = llmClient({
+      chat: () => ({
+        _id: "c1",
+        message: {
+          _id: "a1",
+          reply_to: "u1",
+          content: "Intro.\n\n```sql\nDROP TABLE x;\n```\n\nOutro."
+        }
+      })
+    });
+    const el = await mount(html`<singlebase-chat auto-title="false"></singlebase-chat>`, client);
+    el.afterParse = (blocks) =>
+      blocks
+        .filter((b) => !(b.type === "code" && b.lang === "sql"))
+        .map((b) => (b.type === "p" ? { ...b, text: b.text.toUpperCase() } : b));
+    await el.send("x");
+    await until(settled(el));
+    await el.updateComplete;
+    expect($(el, ".code")).to.equal(null);
+    expect($$(el, ".answer p").map((p) => p.textContent)).to.deep.equal(["INTRO.", "OUTRO."]);
+
+    el.afterParse = (() => "oops") as never; // not an array: falls back to the original
+    await el.updateComplete;
+    el.requestUpdate();
+    await el.updateComplete;
+    expect($(el, ".code")).to.exist;
   });
 
   it("explains itself when there is no client", async () => {

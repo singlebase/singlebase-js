@@ -131,7 +131,7 @@ export const sharedStyles = css`
     color: var(--sb-ink, #16181a);
     background: var(--sb-surface-alt, #fafafa);
     border: 1px solid var(--sb-border, #e4e6e9);
-    border-radius: var(--sb-radius, 4px);
+    border-radius: calc(var(--sb-radius, 4px) * var(--sb-radius-scale, 1));
     padding: var(--sb-field-pad, 11px 13px);
     outline: none;
   }
@@ -201,7 +201,7 @@ export const sharedStyles = css`
     font: inherit;
     font-size: 13.5px;
     font-weight: 500;
-    border-radius: var(--sb-radius, 4px);
+    border-radius: calc(var(--sb-radius, 4px) * var(--sb-radius-scale, 1));
     cursor: pointer;
     padding: 9px 14px;
     border: 1px solid transparent;
@@ -377,7 +377,7 @@ export const sharedStyles = css`
   .notice {
     font-size: 13px;
     line-height: 1.45;
-    border-radius: var(--sb-radius, 4px);
+    border-radius: calc(var(--sb-radius, 4px) * var(--sb-radius-scale, 1));
     padding: 10px 12px;
   }
 
@@ -495,7 +495,7 @@ export const sharedStyles = css`
 
   .acc-item {
     border: 1px solid var(--sb-border, #e4e6e9);
-    border-radius: var(--sb-radius, 4px);
+    border-radius: calc(var(--sb-radius, 4px) * var(--sb-radius-scale, 1));
     overflow: hidden;
     background: transparent;
     transition:
@@ -610,7 +610,7 @@ export const sharedStyles = css`
     padding: 10px 12px;
     background: var(--sb-surface-alt, #fafafa);
     border: 1px solid var(--sb-border, #e4e6e9);
-    border-radius: var(--sb-radius, 4px);
+    border-radius: calc(var(--sb-radius, 4px) * var(--sb-radius-scale, 1));
   }
 
   .invite-label {
@@ -777,7 +777,7 @@ export const sharedStyles = css`
     padding: 14px;
     background: var(--sb-surface-alt, #fafafa);
     border: 1px solid var(--sb-border, #e4e6e9);
-    border-radius: var(--sb-radius, 4px);
+    border-radius: calc(var(--sb-radius, 4px) * var(--sb-radius-scale, 1));
   }
 
   /* 2FA switch */
@@ -826,7 +826,7 @@ export const sharedStyles = css`
     flex: 0 0 auto;
     width: 74px;
     height: 74px;
-    border-radius: var(--sb-radius, 4px);
+    border-radius: calc(var(--sb-radius, 4px) * var(--sb-radius-scale, 1));
     background: var(--sb-surface-alt, #fafafa);
     border: 1px dashed var(--sb-border-strong, #cdd1d6);
     display: flex;
@@ -858,7 +858,7 @@ export const sharedStyles = css`
     gap: 12px;
     padding: 10px 12px;
     border: 1px solid var(--sb-border, #e4e6e9);
-    border-radius: var(--sb-radius, 4px);
+    border-radius: calc(var(--sb-radius, 4px) * var(--sb-radius-scale, 1));
     background: var(--sb-surface-alt, #fafafa);
   }
 
@@ -922,7 +922,7 @@ export const sharedStyles = css`
     font: inherit;
     text-align: left;
     padding: 10px 11px;
-    border-radius: var(--sb-radius, 4px);
+    border-radius: calc(var(--sb-radius, 4px) * var(--sb-radius-scale, 1));
     border: 1px dashed var(--sb-border-strong, #cdd1d6);
     background: transparent;
     cursor: pointer;
@@ -974,7 +974,7 @@ export const sharedStyles = css`
     gap: 12px;
     padding: 14px;
     border: 1px solid var(--sb-danger-panel-border, #efd9d6);
-    border-radius: var(--sb-radius, 4px);
+    border-radius: calc(var(--sb-radius, 4px) * var(--sb-radius-scale, 1));
     background: var(--sb-danger-panel-bg, #fdf7f6);
   }
 

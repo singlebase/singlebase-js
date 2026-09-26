@@ -8,18 +8,14 @@ export interface SinglebaseChatMessages {
   // welcome, per mode
   eyebrowChat: string;
   eyebrowRag: string;
-  eyebrowRich: string;
   headingChat: string;
   headingRag: string;
-  headingRich: string;
   descriptionChat: string;
   descriptionRag: string;
-  descriptionRich: string;
 
   // composer
   placeholderChat: string;
   placeholderRag: string;
-  placeholderRich: string;
   footnote: string;
   attach: string;
   send: string;
@@ -31,7 +27,6 @@ export interface SinglebaseChatMessages {
   // status pills
   thinking: string;
   searching: string;
-  building: string;
 
   // sidebar
   chats: string;
@@ -97,6 +92,19 @@ export interface SinglebaseChatMessages {
   alsoCited: string;
   close: string;
 
+  // rendered blocks
+  renderingChart: string;
+  renderingSvg: string;
+  copySvg: string;
+  showRaw: string;
+  showFormatted: string;
+  showingRows: string;
+  calloutNote: string;
+  calloutTip: string;
+  calloutImportant: string;
+  calloutWarning: string;
+  calloutCaution: string;
+
   // toasts
   undo: string;
   chatDeleted: string;
@@ -131,19 +139,14 @@ export interface SinglebaseChatMessages {
 export const defaultChatMessages: SinglebaseChatMessages = {
   eyebrowChat: "Chat",
   eyebrowRag: "Grounded answers",
-  eyebrowRich: "Charts · tables · images",
   headingChat: "What can I help with?",
   headingRag: "Ask your knowledge base",
-  headingRich: "Ask for a chart or a table",
   descriptionChat: "Ask anything. Attach text files to give it more context.",
   descriptionRag:
     "Answers are grounded in your sources, with a citation for every claim. Attach text files to search them too.",
-  descriptionRich:
-    "Answers come back with charts, tables and images when they help. Attach CSV or JSON files to use your own data.",
 
   placeholderChat: "Message {name}…",
   placeholderRag: "Ask about your sources…",
-  placeholderRich: "Ask for a chart, table or breakdown…",
   footnote: "{name} can make mistakes. Check important details.",
   attach: "Attach files",
   send: "Send message",
@@ -154,7 +157,6 @@ export const defaultChatMessages: SinglebaseChatMessages = {
 
   thinking: "Thinking",
   searching: "Searching sources",
-  building: "Building charts and tables",
 
   chats: "Chats",
   newChat: "New chat",
@@ -214,6 +216,18 @@ export const defaultChatMessages: SinglebaseChatMessages = {
   copyReference: "Copy passage with reference",
   alsoCited: "Also cited",
   close: "Close",
+
+  renderingChart: "Rendering chart",
+  renderingSvg: "Rendering drawing",
+  copySvg: "Copy SVG",
+  showRaw: "View raw",
+  showFormatted: "View formatted",
+  showingRows: "Showing {n} of {total} rows",
+  calloutNote: "Note",
+  calloutTip: "Tip",
+  calloutImportant: "Important",
+  calloutWarning: "Warning",
+  calloutCaution: "Caution",
 
   undo: "Undo",
   chatDeleted: "Chat deleted",

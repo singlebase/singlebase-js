@@ -12,6 +12,8 @@ import type {
 export type UploaderClient = { files: Pick<FilesUploadApi, "upload"> };
 import { tokenDefaults } from "../styles/tokens.js";
 import { sharedStyles } from "../styles/shared.js";
+import { brandingStyles } from "../styles/branding.js";
+import { renderBranding } from "../utils/branding.js";
 import { fill, resolveUploadMessages, type SinglebaseUploadMessages } from "../upload-messages.js";
 import { resolveRedirectTarget } from "../utils/redirect.js";
 import {
@@ -96,6 +98,8 @@ export interface UploaderConfig {
   allowRename: boolean;
   autoUpload: boolean;
   branding: boolean;
+  brandingText: string;
+  brandingUrl: string;
   logoUrl: string;
   logoText: string;
   heading: string;
@@ -113,6 +117,7 @@ export interface UploaderConfig {
   messages: Partial<SinglebaseUploadMessages>;
   theme: "light" | "dark";
   density: "comfortable" | "compact";
+  radius: "sharp" | "default" | "round";
   onComplete: SinglebaseUploader["onComplete"];
   onError: SinglebaseUploader["onError"];
 }
@@ -123,6 +128,8 @@ const CONFIG_KEYS: readonly (keyof UploaderConfig)[] = [
   "allowRename",
   "autoUpload",
   "branding",
+  "brandingText",
+  "brandingUrl",
   "logoUrl",
   "logoText",
   "heading",
@@ -140,6 +147,7 @@ const CONFIG_KEYS: readonly (keyof UploaderConfig)[] = [
   "messages",
   "theme",
   "density",
+  "radius",
   "onComplete",
   "onError"
 ];
@@ -165,6 +173,7 @@ export class SinglebaseUploader extends LitElement {
   static styles = [
     tokenDefaults,
     sharedStyles,
+    brandingStyles,
     css`
       .card {
         display: flex;
@@ -175,7 +184,7 @@ export class SinglebaseUploader extends LitElement {
         background: var(--sb-surface, #ffffff);
         color: var(--sb-ink, #16181a);
         border: 1px solid var(--sb-border, #e4e6e9);
-        border-radius: calc(var(--sb-radius, 4px) + 4px);
+        border-radius: calc((var(--sb-radius, 4px) + 4px) * var(--sb-radius-scale, 1));
       }
 
       .logo-img {
@@ -217,7 +226,7 @@ export class SinglebaseUploader extends LitElement {
         padding: 30px 20px;
         text-align: center;
         border: 1px dashed var(--sb-border-strong, #cdd1d6);
-        border-radius: calc(var(--sb-radius, 4px) + 2px);
+        border-radius: calc((var(--sb-radius, 4px) + 2px) * var(--sb-radius-scale, 1));
         background: var(--sb-surface, #ffffff);
         transition:
           border-color 0.15s,
@@ -257,7 +266,7 @@ export class SinglebaseUploader extends LitElement {
         gap: 12px;
         padding: 10px 12px;
         border: 1px solid var(--sb-border, #e4e6e9);
-        border-radius: calc(var(--sb-radius, 4px) + 2px);
+        border-radius: calc((var(--sb-radius, 4px) + 2px) * var(--sb-radius-scale, 1));
         background: var(--sb-surface-alt, #fafafa);
         transition:
           border-color 0.15s,
@@ -304,7 +313,7 @@ export class SinglebaseUploader extends LitElement {
         color: var(--sb-muted-ink, #61666c);
         background: var(--sb-surface-alt, #fafafa);
         border: 1px solid var(--sb-border, #e4e6e9);
-        border-radius: var(--sb-radius, 4px);
+        border-radius: calc(var(--sb-radius, 4px) * var(--sb-radius-scale, 1));
         overflow: hidden;
       }
 
@@ -393,7 +402,7 @@ export class SinglebaseUploader extends LitElement {
         color: var(--sb-ink, #16181a);
         background: none;
         border: 1px dashed var(--sb-border-strong, #cdd1d6);
-        border-radius: calc(var(--sb-radius, 4px) + 2px);
+        border-radius: calc((var(--sb-radius, 4px) + 2px) * var(--sb-radius-scale, 1));
       }
 
       button.add-more:hover:not(:disabled) {
@@ -404,25 +413,6 @@ export class SinglebaseUploader extends LitElement {
         width: 100%;
         padding: 13px;
         font-size: 14px;
-      }
-
-      .branding {
-        text-align: center;
-        font-family: var(--sb-mono, "Geist Mono", ui-monospace, monospace);
-        font-size: 10.5px;
-        letter-spacing: 0.06em;
-        color: var(--sb-muted-ink, #61666c);
-      }
-
-      .branding a {
-        color: inherit;
-        text-decoration: none;
-      }
-
-      .branding a:hover {
-        color: var(--sb-ink, #16181a);
-        text-decoration: underline;
-        text-underline-offset: 3px;
       }
 
       /* the button view is just a control, not a card */
@@ -452,6 +442,10 @@ export class SinglebaseUploader extends LitElement {
   @property({ reflect: true })
   accessor density: "comfortable" | "compact" | undefined = undefined;
 
+  /** Corner preset for this element: `sharp`, `default` or `round`. */
+  @property({ reflect: true })
+  accessor radius: "sharp" | "default" | "round" | undefined = undefined;
+
   // ── shape ─────────────────────────────────────────────────
   /**
    * `full` is the card with a dropzone and a reviewable list, `compact` the
@@ -476,6 +470,12 @@ export class SinglebaseUploader extends LitElement {
   /** The "Files by Singlebase" credit. A plain link — it makes no request. */
   @property({ converter: flagAttr })
   accessor branding = true;
+
+  /** The credit's text. Empty uses the element's default ("… by Singlebase"). */
+  @property({ attribute: "branding-text" }) accessor brandingText = "";
+
+  /** Where the credit links to. Only http(s); anything else uses singlebase.cloud. */
+  @property({ attribute: "branding-url" }) accessor brandingUrl = "";
 
   @property({ attribute: "logo-url" }) accessor logoUrl = "";
   @property({ attribute: "logo-text" }) accessor logoText = "";
@@ -576,6 +576,15 @@ export class SinglebaseUploader extends LitElement {
     for (const key of CONFIG_KEYS) {
       if (value && key in value) target[key] = value[key];
     }
+  }
+
+  /**
+   * Changes settings on the fly. Only the keys you pass change; staged files
+   * stay. Returns the element, so calls chain.
+   */
+  configure(options: Partial<UploaderConfig>): this {
+    this.config = options;
+    return this;
   }
 
   get config(): Partial<UploaderConfig> {
@@ -909,12 +918,12 @@ export class SinglebaseUploader extends LitElement {
   }
 
   private renderBranding() {
-    if (!this.branding) return nothing;
-    return html`<div class="branding" part="branding">
-      <a href="https://singlebase.cloud" target="_blank" rel="noopener noreferrer"
-        >${this.msg.brandingLabel}</a
-      >
-    </div>`;
+    return renderBranding(
+      this.branding,
+      this.brandingText,
+      this.msg.brandingLabel,
+      this.brandingUrl
+    );
   }
 
   private renderNotice() {

@@ -4,7 +4,10 @@
  */
 export { SinglebaseChat, describeSource } from "./elements/chat.js";
 export type {
+  ChatAfterParse,
   ChatAttachment,
+  ChatBeforeSend,
+  ChatBlockRenderer,
   ChatClient,
   ChatConfig,
   ChatEmbed,
@@ -13,6 +16,7 @@ export type {
   ChatMessage,
   ChatMode,
   ChatPrompt,
+  ChatSidebar,
   ChatSummary
 } from "./elements/chat.js";
 export {
@@ -20,8 +24,10 @@ export {
   citedNumbers,
   parseInline,
   parseMarkdown,
+  settleStreaming,
   splitFollowups
 } from "./utils/markdown.js";
-export type { Block, ChartSpec, RenderAs, Segment } from "./utils/markdown.js";
+export { svgDataUrl } from "./utils/svg.js";
+export type { Block, ChartSpec, ChatFormat, Segment } from "./utils/markdown.js";
 export { defaultChatMessages, resolveChatMessages } from "./chat-messages.js";
 export type { SinglebaseChatMessages } from "./chat-messages.js";
