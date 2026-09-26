@@ -3,21 +3,21 @@
  * <singlebase-authui>, <singlebase-authui-guard>, <singlebase-authui-buttons>
  * and <singlebase-authui-display>. Importing it registers them.
  */
-export { SinglebaseAuthScreen } from "./elements/auth-screen.js";
-export type { Screen, GuestScreen, ProtectedScreen } from "./elements/auth-screen.js";
-export { isScreen, isGuestScreen, isProtectedScreen } from "./elements/auth-screen.js";
+export { SinglebaseAuthScreen } from "./elements/authui.js";
+export type { Screen, GuestScreen, ProtectedScreen } from "./elements/authui.js";
+export { isScreen, isGuestScreen, isProtectedScreen } from "./elements/authui.js";
 
-export { SinglebaseAuthGuard } from "./elements/guard.js";
-export type { GuardState } from "./elements/guard.js";
+export { SinglebaseAuthGuard } from "./elements/authui-guard.js";
+export type { GuardState } from "./elements/authui-guard.js";
 
-export { SinglebaseAuthButtons } from "./elements/buttons.js";
-export type { ButtonsType } from "./elements/buttons.js";
+export { SinglebaseAuthButtons } from "./elements/authui-buttons.js";
+export type { ButtonsType } from "./elements/authui-buttons.js";
 
-export { SinglebaseAuthDisplay } from "./elements/display.js";
+export { SinglebaseAuthDisplay } from "./elements/authui-display.js";
 
 // Composed by <singlebase-authui> for the account screen. Registers its own tag
 // because the widget renders it in a template; not part of the documented surface.
-export { SinglebaseAccountScreen } from "./elements/account-screen.js";
+export { SinglebaseAccountScreen } from "./elements/authui-account.js";
 
 export { AuthController } from "./controllers/auth-controller.js";
 export { SettingsController } from "./controllers/settings-controller.js";

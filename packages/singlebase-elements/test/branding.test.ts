@@ -1,5 +1,5 @@
 import { expect } from "@open-wc/testing";
-import "../src/elements/auth-screen.js";
+import "../src/elements/authui.js";
 import { mountWidget, signedInClient, textOf } from "./fixtures.js";
 
 const badge = (el: { shadowRoot: ShadowRoot | null }) =>

@@ -1,6 +1,6 @@
 import { fixture, html, expect, aTimeout } from "@open-wc/testing";
-import "../src/elements/account-screen.js";
-import type { SinglebaseAccountScreen } from "../src/elements/account-screen.js";
+import "../src/elements/authui-account.js";
+import type { SinglebaseAccountScreen } from "../src/elements/authui-account.js";
 import { SETTINGS, signedInClient } from "./fixtures.js";
 
 async function mountAccount(overrides: Record<string, unknown> = {}) {

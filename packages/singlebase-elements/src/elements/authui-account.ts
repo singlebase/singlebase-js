@@ -1,7 +1,7 @@
 import { html, nothing, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { createFilesUploadApi, type AuthSettings } from "@singlebase/singlebase-sdk";
-import { SinglebaseFormBase } from "./form-base.js";
+import { SinglebaseFormBase } from "./authui-form-base.js";
 import { SettingsController } from "../controllers/settings-controller.js";
 import { fullNameOf, initialsOf } from "../utils/profile.js";
 import "./uploader.js";

@@ -1,5 +1,5 @@
 import { expect, aTimeout } from "@open-wc/testing";
-import "../src/elements/auth-screen.js";
+import "../src/elements/authui.js";
 import { mountWidget, signedOutClient } from "./fixtures.js";
 
 /**

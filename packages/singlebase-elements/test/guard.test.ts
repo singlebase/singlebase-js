@@ -1,6 +1,6 @@
 import { fixture, html, expect } from "@open-wc/testing";
-import "../src/elements/guard.js";
-import type { SinglebaseAuthGuard } from "../src/elements/guard.js";
+import "../src/elements/authui-guard.js";
+import type { SinglebaseAuthGuard } from "../src/elements/authui-guard.js";
 import { signedInClient, signedOutClient } from "./fixtures.js";
 import { makeUserProfile } from "./mock-client.js";
 

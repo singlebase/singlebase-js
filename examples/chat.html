@@ -1,0 +1,396 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>singlebase-chat</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font:
+          14px/1.5 "Geist",
+          -apple-system,
+          "Segoe UI",
+          sans-serif;
+        background: #f4f4f5;
+        color: #16181a;
+      }
+      body.dark {
+        background: #0e0f11;
+        color: #ecedee;
+      }
+      .bar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px 18px;
+        min-height: 52px;
+        padding: 8px 20px;
+        background: #fff;
+        border-bottom: 1px solid #e4e6e9;
+      }
+      body.dark .bar {
+        background: #141517;
+        border-color: #2e3136;
+      }
+      .bar b {
+        font-size: 13px;
+        margin-right: 6px;
+      }
+      .seg {
+        display: inline-flex;
+        gap: 2px;
+        padding: 2px;
+        background: #f2f3f4;
+        border-radius: 6px;
+      }
+      body.dark .seg {
+        background: #24272b;
+      }
+      .seg button {
+        font: inherit;
+        font-size: 12.5px;
+        font-weight: 500;
+        padding: 4px 11px;
+        border: none;
+        border-radius: 4px;
+        background: transparent;
+        color: #61666c;
+        cursor: pointer;
+      }
+      .seg button[aria-pressed="true"] {
+        background: #fff;
+        color: #16181a;
+        box-shadow: 0 1px 2px rgba(22, 24, 26, 0.12);
+      }
+      body.dark .seg button[aria-pressed="true"] {
+        background: #141517;
+        color: #ecedee;
+      }
+      .note {
+        font-size: 12px;
+        color: #61666c;
+        margin-left: auto;
+      }
+      #stage {
+        height: calc(100vh - 52px);
+        min-height: 560px;
+      }
+      #stage.page {
+        display: flex;
+      }
+      .fake-nav {
+        flex: 0 0 64px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 14px;
+        padding: 18px 0;
+        background: #fff;
+        border-right: 1px solid #e4e6e9;
+      }
+      body.dark .fake-nav {
+        background: #141517;
+        border-color: #2e3136;
+      }
+      .fake-nav span {
+        width: 22px;
+        height: 22px;
+        border-radius: 5px;
+        background: #e4e6e9;
+      }
+      .fake-nav span:first-child {
+        width: 28px;
+        height: 28px;
+        background: #16181a;
+        margin-bottom: 12px;
+      }
+      .page-slot {
+        flex: 1;
+        min-width: 0;
+      }
+      .inline-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 40px;
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 40px 24px;
+      }
+      .filler {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+      .filler span {
+        height: 12px;
+        border-radius: 6px;
+        background: #e4e6e9;
+      }
+      body.dark .filler span {
+        background: #24272b;
+      }
+      @media (max-width: 900px) {
+        .inline-grid {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="bar">
+      <b>&lt;singlebase-chat&gt;</b>
+      <span class="seg" data-key="embed">
+        <button data-value="page">Full page</button>
+        <button data-value="inline">Inline</button>
+        <button data-value="launcher">Launcher</button>
+      </span>
+      <span class="seg" data-key="mode">
+        <button data-value="chat">Chat</button>
+        <button data-value="rag">RAG</button>
+        <button data-value="rich">Advanced</button>
+      </span>
+      <span class="seg" data-key="theme">
+        <button data-value="light">Light</button>
+        <button data-value="dark">Dark</button>
+      </span>
+      <span class="seg" data-key="glow">
+        <button data-value="subtle">Subtle</button>
+        <button data-value="vivid">Vivid</button>
+        <button data-value="off">Off</button>
+      </span>
+      <span class="note">Mock <code>llm</code> service — nothing leaves your machine.</span>
+    </div>
+    <div id="stage"></div>
+
+    <script type="module">
+      import "../packages/singlebase-elements/dist/singlebase-elements.min.js";
+
+      // ── a stand-in for SinglebaseClient().llm, same operations and shapes ──
+      const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+      const now = () => new Date().toISOString();
+      const ago = (days) => new Date(Date.now() - days * 86_400_000).toISOString();
+      const id = () => Math.random().toString(36).slice(2, 10);
+
+      const SOURCES = [
+        {
+          title: "One-time sign-in codes",
+          path: "help/sign-in/one-time-codes",
+          collection: "Help Center",
+          updated: "Aug 2026",
+          score: 0.86,
+          content:
+            "We send a 6-digit code to your inbox. Codes expire after 10 minutes and can only be used once. Requesting a new code invalidates the previous one."
+        },
+        {
+          title: "Rate limits",
+          path: "api/reference/rate-limits",
+          collection: "API Reference",
+          updated: "Aug 2026",
+          score: 0.64,
+          content: "Code requests are limited to 3 per minute per email address and 20 per hour per IP address."
+        },
+        {
+          title: "Session timeout for SSO",
+          path: "security/sso-sessions",
+          collection: "Security Policy",
+          updated: "May 2026",
+          score: 0.41,
+          content: "Workspace admins can set an idle timeout between 15 minutes and 24 hours. The default is 8 hours."
+        }
+      ];
+
+      const chart = (o) => "```chart\n" + JSON.stringify(o) + "\n```";
+      const WEEKS = ["Aug 17", "Aug 24", "Aug 31", "Sep 7", "Sep 14", "Sep 21"];
+      const METHODS = [
+        ["Password", [4210, 4105, 3980, 3890, 3720, 3610]],
+        ["Email code", [2140, 2380, 2610, 2890, 3120, 3405]],
+        ["Google", [3050, 3120, 3190, 3260, 3310, 3390]],
+        ["GitHub", [820, 860, 905, 930, 980, 1010]]
+      ];
+
+      function answer(mode, text) {
+        if (mode === "rag") {
+          return {
+            sources: SOURCES,
+            content:
+              "Here is what your sources say.\n\n" +
+              "- A one-time code is valid for **10 minutes** and works only once [1].\n" +
+              "- You can request up to 3 codes per minute per email address [2].\n" +
+              "- SSO sessions time out after 8 hours of inactivity by default [3].\n\n" +
+              "FOLLOWUPS: What happens after 5 wrong codes? | How do I change the SSO timeout? | Are codes case-sensitive?"
+          };
+        }
+        if (mode === "rich") {
+          return {
+            content:
+              "Email code sign-ins grew **59%** in six weeks and are close to overtaking passwords, which fell **14%**.\n\n" +
+              chart({
+                type: "line",
+                title: "Weekly sign-ins by method",
+                labels: WEEKS,
+                series: METHODS.map(([name, values]) => ({ name, values }))
+              }) +
+              "\n\n" +
+              chart({
+                type: "bar",
+                title: "Failure rate by method",
+                unit: "%",
+                labels: METHODS.map(([n]) => n),
+                series: [{ name: "Failure rate", values: [6.8, 3.1, 1.2, 1.4] }]
+              }) +
+              "\n\n| Method | Aug 17 | Sep 21 | Failure rate |\n|---|---|---|---|\n" +
+              METHODS.map(([n, v], i) => `| ${n} | ${v[0].toLocaleString()} | ${v[5].toLocaleString()} | ${[6.8, 3.1, 1.2, 1.4][i]}% |`).join("\n") +
+              "\n\n> Google holds steady at about 30% of sign-ins.\n\n" +
+              "FOLLOWUPS: Which method fails most? | Show only the weekly total | Compare Google and GitHub"
+          };
+        }
+        return {
+          content:
+            "## A quick answer\n\nYou asked: “" + text + "”. Here's a **sample** reply with a code block:\n\n" +
+            "```js\nexport function debounce(fn, ms = 200) {\n  let t;\n  return (...args) => {\n    clearTimeout(t);\n    t = setTimeout(() => fn(...args), ms);\n  };\n}\n```\n\n" +
+            "- Works with any function\n- Keeps the latest arguments\n\n" +
+            "FOLLOWUPS: Add a leading-edge option | Write it in TypeScript | Add a cancel method"
+        };
+      }
+
+      const store = {
+        chats: [
+          { _id: "c1", title: "Sign-ins by method", bookmarked: true, _modified_at: ago(0.1), messages: [] },
+          { _id: "c2", title: "Rate limits on code requests", _modified_at: ago(1), messages: [] },
+          { _id: "c3", title: "Welcome email draft", _modified_at: ago(4), messages: [] },
+          { _id: "c4", title: "Session timeout for SSO users", _modified_at: ago(20), messages: [] }
+        ]
+      };
+      for (const c of store.chats) {
+        const reply = answer(c._id === "c1" ? "rich" : c._id === "c3" ? "chat" : "rag", c.title);
+        c.messages = [
+          { _id: id(), role: "system", content: "hidden" },
+          { _id: id(), role: "user", content: c.title, _created_at: c._modified_at },
+          { _id: id(), role: "assistant", ...reply, _created_at: c._modified_at, exec_time: 0.8 }
+        ];
+      }
+      const summary = ({ messages, ...rest }) => rest;
+      let currentMode = "chat";
+
+      const mockClient = {
+        llm: {
+          async call(method, p = {}, options = {}) {
+            await wait(method === "chat" ? 1400 : 250);
+            if (options.signal?.aborted) throw new Error("ABORTED");
+            const chat = store.chats.find((c) => c._id === p._id);
+            switch (method) {
+              case "list_chats":
+                return { items: store.chats.map(summary) };
+              case "get_chat":
+                if (!chat) throw Object.assign(new Error("NOT_FOUND"), { details: { status: 404 } });
+                return { ...summary(chat), messages: chat.messages };
+              case "chat": {
+                let c = chat;
+                if (!c) {
+                  c = { _id: id(), title: p.title, bookmarked: false, messages: [] };
+                  store.chats.unshift(c);
+                }
+                c._modified_at = now();
+                const user = { _id: id(), role: "user", content: p.message, _created_at: now() };
+                const reply = answer(currentMode, p.message);
+                const bot = { _id: id(), role: "assistant", ...reply, reply_to: user._id, exec_time: 1.2, _created_at: now() };
+                c.messages.push(user, bot);
+                return { _id: c._id, title: c.title, bookmarked: !!c.bookmarked, message: bot };
+              }
+              case "generate":
+                return { result: '"' + p.user_input.split("\n")[0].replace(/^user:\s*/, "").slice(0, 28) + '"' };
+              case "update_chat":
+              case "bookmark_chat":
+                Object.assign(chat ?? {}, "title" in p ? { title: p.title } : {}, "bookmarked" in p ? { bookmarked: p.bookmarked } : {});
+                return chat ? summary(chat) : {};
+              case "delete_chat":
+                store.chats = store.chats.filter((c) => c._id !== p._id);
+                return {};
+              case "bookmark_chat_message":
+              case "delete_chat_message": {
+                const m = chat?.messages.find((x) => x._id === p.message_id);
+                if (m && method === "bookmark_chat_message") m.bookmarked = p.bookmarked;
+                if (m && method === "delete_chat_message") chat.messages = chat.messages.filter((x) => x !== m);
+                return {};
+              }
+              default:
+                return {};
+            }
+          }
+        }
+      };
+
+      // ── the switches ──
+      const state = { embed: "page", mode: "chat", theme: "light", glow: "subtle" };
+      const stage = document.getElementById("stage");
+
+      function render() {
+        currentMode = state.mode;
+        document.body.classList.toggle("dark", state.theme === "dark");
+        for (const seg of document.querySelectorAll(".seg")) {
+          for (const b of seg.querySelectorAll("button")) {
+            b.setAttribute("aria-pressed", String(state[seg.dataset.key] === b.dataset.value));
+          }
+        }
+
+        const chat = document.createElement("singlebase-chat");
+        chat.client = mockClient;
+        chat.config = {
+          embed: state.embed,
+          mode: state.mode,
+          theme: state.theme,
+          glow: state.glow,
+          assistantName: "Acme Assistant",
+          greetingBubble: true,
+          unreadBadge: true,
+          bubbleText: "Hi, questions about sign-in or the API? Ask me here."
+        };
+        for (const name of ["send", "response", "title", "error", "feedback", "export", "delete"]) {
+          chat.addEventListener(`singlebase-chat-${name}`, (e) => console.log(name, e.detail));
+        }
+
+        stage.className = state.embed;
+        stage.replaceChildren();
+        if (state.embed === "page") {
+          const nav = document.createElement("nav");
+          nav.className = "fake-nav";
+          nav.innerHTML = "<span></span><span></span><span></span><span></span>";
+          const slot = document.createElement("div");
+          slot.className = "page-slot";
+          slot.append(chat);
+          stage.append(nav, slot);
+        } else {
+          const grid = document.createElement("div");
+          grid.className = "inline-grid";
+          const filler = document.createElement("div");
+          filler.className = "filler";
+          filler.innerHTML = [70, 45, 90, 84, 62, 80, 55].map((w) => `<span style="width:${w}%"></span>`).join("");
+          grid.append(filler);
+          if (state.embed === "inline") grid.append(chat);
+          else stage.append(chat);
+          stage.prepend(grid);
+        }
+      }
+
+      for (const seg of document.querySelectorAll(".seg")) {
+        seg.addEventListener("click", (e) => {
+          const value = e.target.closest("button")?.dataset.value;
+          if (!value) return;
+          state[seg.dataset.key] = value;
+          render();
+        });
+      }
+      render();
+    </script>
+  </body>
+</html>

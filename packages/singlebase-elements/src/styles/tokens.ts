@@ -40,7 +40,7 @@ export const TOKEN_DEFAULTS = {
  * Base host layout plus the theme="dark"/density="compact" attribute
  * overrides. These overrides are legitimate unconditional assignments —
  * they only fire when *this* element carries the attribute — but every
- * composite element (auth-screen, reset-password-form, etc.) must forward
+ * composite element (<singlebase-authui>, <singlebase-authui-account>) must forward
  * theme/density/field-style to the singlebase-* children it renders for the
  * override to reach elements that don't carry the attribute directly.
  */

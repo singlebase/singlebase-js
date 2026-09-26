@@ -1,7 +1,7 @@
 import { html } from "lit";
 import { customElement, property } from "lit/decorators.js";
 import { matchesPredicate, validatePredicate, type Predicate } from "@singlebase/core";
-import { SinglebaseElementBase } from "./base.js";
+import { SinglebaseElementBase } from "./authui-base.js";
 
 export type GuardState = "loading" | "authenticated" | "unauthenticated";
 

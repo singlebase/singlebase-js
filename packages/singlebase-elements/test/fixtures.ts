@@ -1,6 +1,6 @@
 import { fixture, html } from "@open-wc/testing";
 import type { AuthState } from "@singlebase/singlebase-sdk";
-import type { SinglebaseAuthScreen } from "../src/elements/auth-screen.js";
+import type { SinglebaseAuthScreen } from "../src/elements/authui.js";
 import { createMockClient, makeSession, makeUserProfile } from "./mock-client.js";
 
 export const SETTINGS = {

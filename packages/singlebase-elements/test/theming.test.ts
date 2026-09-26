@@ -1,7 +1,7 @@
 import { fixture, html, expect } from "@open-wc/testing";
-import "../src/elements/auth-screen.js";
-import "../src/elements/buttons.js";
-import type { SinglebaseAuthScreen } from "../src/elements/auth-screen.js";
+import "../src/elements/authui.js";
+import "../src/elements/authui-buttons.js";
+import type { SinglebaseAuthScreen } from "../src/elements/authui.js";
 import { mountWidget, signedInClient } from "./fixtures.js";
 
 describe("theming attributes", () => {

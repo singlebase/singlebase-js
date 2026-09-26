@@ -1,7 +1,7 @@
 import { html, nothing, type PropertyValues } from "lit";
 import { customElement, property } from "lit/decorators.js";
 import type { AuthSettings, OAuthIntent } from "@singlebase/singlebase-sdk";
-import { SinglebaseFormBase } from "./form-base.js";
+import { SinglebaseFormBase } from "./authui-form-base.js";
 import { SettingsController } from "../controllers/settings-controller.js";
 
 export type ButtonsType = "signout" | "oauth" | "link";

@@ -1,6 +1,6 @@
 import { expect } from "@open-wc/testing";
-import "../src/elements/auth-screen.js";
-import { isGuestScreen, isProtectedScreen, isScreen } from "../src/elements/auth-screen.js";
+import "../src/elements/authui.js";
+import { isGuestScreen, isProtectedScreen, isScreen } from "../src/elements/authui.js";
 import { mountWidget, signedInClient, signedOutClient, textOf } from "./fixtures.js";
 
 describe("screen routing", () => {

@@ -7,12 +7,12 @@ import {
   type AuthClient,
   type AuthSettings
 } from "@singlebase/singlebase-sdk";
-import { SinglebaseElementBase } from "./base.js";
+import { SinglebaseElementBase } from "./authui-base.js";
 import { resolveRedirectTarget } from "../utils/redirect.js";
 import { SettingsController } from "../controllers/settings-controller.js";
 import { EventBridge } from "../controllers/event-bridge.js";
-import "./account-screen.js";
-import "./buttons.js";
+import "./authui-account.js";
+import "./authui-buttons.js";
 
 /** Screens a signed-out visitor may reach. */
 export type GuestScreen = "signin" | "signup" | "forgot" | "verify" | "otp" | "newpass" | "invite";

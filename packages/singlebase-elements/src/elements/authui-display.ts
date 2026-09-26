@@ -1,7 +1,7 @@
 import { css, html, nothing, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { getPath } from "@singlebase/core";
-import { SinglebaseElementBase } from "./base.js";
+import { SinglebaseElementBase } from "./authui-base.js";
 import { initialsOf } from "../utils/profile.js";
 
 /** Where the avatar looks for its image when no path is given. */

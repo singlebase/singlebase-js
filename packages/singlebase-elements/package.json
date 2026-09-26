@@ -1,7 +1,7 @@
 {
   "name": "@singlebase/elements",
   "version": "0.3.0",
-  "description": "Singlebase web components \u2014 authentication UI and file uploads as custom elements",
+  "description": "Singlebase web components — authentication UI, file uploads and AI chat as custom elements",
   "homepage": "https://singlebase.cloud",
   "type": "module",
   "license": "MIT",
@@ -28,6 +28,11 @@
       "types": "./dist/uploader.d.ts",
       "import": "./dist/uploader.js",
       "require": "./dist/uploader.cjs"
+    },
+    "./chat": {
+      "types": "./dist/chat.d.ts",
+      "import": "./dist/chat.js",
+      "require": "./dist/chat.cjs"
     },
     "./standalone": "./dist/singlebase-elements.min.js",
     "./package.json": "./package.json"
@@ -61,7 +66,10 @@
     "auth",
     "authentication",
     "upload",
-    "files"
+    "files",
+    "chat",
+    "ai",
+    "llm"
   ],
   "repository": {
     "type": "git",

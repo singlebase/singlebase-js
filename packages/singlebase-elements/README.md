@@ -4,6 +4,7 @@ Singlebase web components, framework-free:
 
 - `<singlebase-authui>` and friends — sign-in, sign-up, codes, OAuth and the account view
 - `<singlebase-uploader>` — pick, check and upload files straight to storage
+- `<singlebase-chat>` — an AI chat workspace on the `llm` service
 
 ```bash
 npm install @singlebase/elements @singlebase/singlebase-sdk
@@ -13,6 +14,7 @@ npm install @singlebase/elements @singlebase/singlebase-sdk
 import "@singlebase/elements";            // everything
 import "@singlebase/elements/authui";     // auth elements only
 import "@singlebase/elements/uploader";   // uploader only
+import "@singlebase/elements/chat";       // chat only
 ```
 
 Or with no build step:

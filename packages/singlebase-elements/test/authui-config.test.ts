@@ -1,8 +1,8 @@
 import { fixture, html, expect } from "@open-wc/testing";
 import type { AuthUIConfig } from "@singlebase/core";
-import "../src/elements/auth-screen.js";
-import "../src/elements/display.js";
-import type { SinglebaseAuthScreen } from "../src/elements/auth-screen.js";
+import "../src/elements/authui.js";
+import "../src/elements/authui-display.js";
+import type { SinglebaseAuthScreen } from "../src/elements/authui.js";
 import { SETTINGS, signedInClient, signedOutClient } from "./fixtures.js";
 
 /** A client carrying page-wide UI config, as SinglebaseClient({ authui }) would. */

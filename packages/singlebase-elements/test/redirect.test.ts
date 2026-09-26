@@ -1,7 +1,7 @@
 import { fixture, html, expect } from "@open-wc/testing";
 import { resolveRedirectTarget } from "../src/utils/redirect.js";
-import "../src/elements/buttons.js";
-import type { SinglebaseAuthButtons } from "../src/elements/buttons.js";
+import "../src/elements/authui-buttons.js";
+import type { SinglebaseAuthButtons } from "../src/elements/authui-buttons.js";
 import { signedInClient, signedOutClient } from "./fixtures.js";
 
 const HERE = "https://app.example.com/login";

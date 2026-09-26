@@ -13,12 +13,13 @@ export default defineConfig({
   esbuild: { target: "es2022" },
   build: {
     lib: {
-      // One entry per family, so a bundler can take just the uploader or just
-      // the auth elements. Shared code lands in common chunks.
+      // One entry per family, so a bundler can take just the uploader, just the
+      // chat or just the auth elements. Shared code lands in common chunks.
       entry: {
         index: resolve(__dirname, "src/index.ts"),
         authui: resolve(__dirname, "src/authui.ts"),
-        uploader: resolve(__dirname, "src/uploader.ts")
+        uploader: resolve(__dirname, "src/uploader.ts"),
+        chat: resolve(__dirname, "src/chat.ts")
       },
       fileName: (format, name) => `${name}.${format === "es" ? "js" : "cjs"}`,
       formats: ["es", "cjs"]

@@ -1,7 +1,7 @@
 import { fixture, html, expect, aTimeout } from "@open-wc/testing";
 import { resolveScreen } from "@singlebase/singlebase-sdk";
-import "../src/elements/auth-screen.js";
-import type { SinglebaseAuthScreen } from "../src/elements/auth-screen.js";
+import "../src/elements/authui.js";
+import type { SinglebaseAuthScreen } from "../src/elements/authui.js";
 import { createMockClient } from "./mock-client.js";
 
 const SETTINGS = {

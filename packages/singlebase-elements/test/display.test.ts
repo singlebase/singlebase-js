@@ -1,6 +1,6 @@
 import { fixture, html, expect } from "@open-wc/testing";
-import "../src/elements/display.js";
-import type { SinglebaseAuthDisplay } from "../src/elements/display.js";
+import "../src/elements/authui-display.js";
+import type { SinglebaseAuthDisplay } from "../src/elements/authui-display.js";
 import { signedInClient, signedOutClient } from "./fixtures.js";
 import { createMockClient, makeUserProfile } from "./mock-client.js";
 

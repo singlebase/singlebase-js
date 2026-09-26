@@ -1,7 +1,7 @@
 import { html } from "lit";
 import { state } from "lit/decorators.js";
 import { SinglebaseAuthError, mapErrorToHint } from "@singlebase/singlebase-sdk";
-import { SinglebaseElementBase } from "./base.js";
+import { SinglebaseElementBase } from "./authui-base.js";
 
 export type FormPhase = "idle" | "submitting" | "success" | "error";
 

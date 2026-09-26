@@ -8,7 +8,7 @@ anything that can render a tag.
 | Package | What it is |
 | --- | --- |
 | [`@singlebase/singlebase-sdk`](./packages/singlebase-sdk) | `SinglebaseClient()` — auth, data, files, user, LLM and any other service |
-| [`@singlebase/elements`](./packages/singlebase-elements) | Web components: [`<singlebase-authui>`](./SBC-AUTHUI.md) and [`<singlebase-uploader>`](./SBC-UPLOADER.md) |
+| [`@singlebase/elements`](./packages/singlebase-elements) | Web components: [`<singlebase-authui>`](./SBC-AUTHUI.md), [`<singlebase-uploader>`](./SBC-UPLOADER.md) and [`<singlebase-chat>`](./SBC-CHAT.md) |
 | [`@singlebase/core`](./packages/core) | Internal transport and shared plumbing. Installed for you. |
 
 ## Install
@@ -193,10 +193,25 @@ the API, not the payload.
 | `llm.chat` | A persisted conversation turn | `message` |
 | `llm.ask` | A one-off conversational answer | `message` |
 | `llm.embed` | Embeddings | `documents` |
+| `llm.list_chats` | The user's conversations | — |
+| `llm.get_chat` | One conversation with its messages | `_id` |
+| `llm.update_chat` | Rename and/or bookmark | `_id` |
+| `llm.bookmark_chat` | Bookmark a conversation | `_id`, `bookmarked` |
+| `llm.delete_chat` | Delete a conversation | `_id` |
+| `llm.bookmark_chat_message` | Bookmark one message | `_id`, `message_id`, `bookmarked` |
+| `llm.delete_chat_message` | Delete one message | `_id`, `message_id` |
 
 ```js
 const answer = await sbc.llm.ask({ message: "What changed in Q3?" });
+
+// A conversation: omit _id on the first turn, then send back the one you get.
+let turn = await sbc.llm.chat({ message: "Plan a launch", format: "markdown" });
+turn = await sbc.llm.chat({ _id: turn._id, message: "Make it shorter" });
 ```
+
+`llm.chat` and `llm.ask` take a `retrieval` array to ground one turn in your
+data: `kdb`, `vector`, `docs`, `json`, `csv`, `data`, `generate` or `s3`
+sources. For a ready-made chat UI, see [SBC-CHAT.md](./SBC-CHAT.md).
 
 ## Web components
 
@@ -204,23 +219,31 @@ const answer = await sbc.llm.ask({ message: "What changed in Q3?" });
 | --- | --- |
 | <img src="./docs/images/authui.png" alt="The sign-in screen of singlebase-authui" width="360"> | <img src="./docs/images/uploader.png" alt="singlebase-uploader with an image and a PDF staged" width="400"> |
 
+| `<singlebase-chat>` |
+| --- |
+| <img src="./docs/images/chat.png" alt="singlebase-chat with the chat list, a cited answer and follow-up questions" width="780"> |
+
 ```js
 import "@singlebase/elements";           // everything
 import "@singlebase/elements/authui";    // auth elements only
 import "@singlebase/elements/uploader";  // the uploader only
+import "@singlebase/elements/chat";      // the chat only
 ```
 
 ```html
 <singlebase-authui></singlebase-authui>
 <singlebase-uploader accept=".pdf" max-files="5"></singlebase-uploader>
+<singlebase-chat embed="launcher" mode="rag" retrieval='[{"type":"kdb","namespace":"docs"}]'></singlebase-chat>
 ```
 
 - **[SBC-AUTHUI.md](./SBC-AUTHUI.md)** — sign-in, sign-up, codes, OAuth, the
   account view, guards and profile display.
 - **[SBC-UPLOADER.md](./SBC-UPLOADER.md)** — file picking, checks, previews and
   direct-to-storage uploads.
+- **[SBC-CHAT.md](./SBC-CHAT.md)** — an AI chat workspace: history, cited
+  sources, charts, bookmarks and export, as a page, a panel or a launcher.
 
-Both are themed with the same `--sb-*` CSS custom properties.
+All are themed with the same `--sb-*` CSS custom properties.
 
 ## Development
 
@@ -233,13 +256,25 @@ pnpm example      # serves the repo at http://localhost:4517
 ```
 
 Open `examples/index.html` (the auth widget), `examples/customize.html`
-(the visual customizer), `examples/uploader.html` (the uploader) or
-`examples/spa.html` (the client in a single-page app). All run against mocks.
+(the visual customizer), `examples/uploader.html` (the uploader),
+`examples/chat.html` (the chat) or `examples/spa.html` (the client in a
+single-page app). All run against mocks.
 
 ## Publish
 
 You need to be logged in to npm (`npm login`) with access to the `@singlebase`
 organization, and have a clean, committed working tree.
+
+```bash
+scripts/release.sh patch           # or minor, major, or an exact 1.2.3
+```
+
+It bumps all three packages to the same version, runs `pnpm verify`, commits
+`Release vX.Y.Z`, tags `vX.Y.Z`, publishes with pnpm and pushes the commit and
+tag. Add `--dry-run` (`scripts/release.sh minor --dry-run`) to verify the bump
+and then revert it, with nothing committed or published.
+
+By hand, the same steps are:
 
 ```bash
 pnpm verify                        # format check, build, test
