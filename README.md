@@ -1,13 +1,14 @@
 # singlebase-js
 
-This is the offical TS/JS toolking [Singlebase](https://singlebase.io). 
+This is the offical TS/JS toolking [Singlebase](https://singlebase.io), for access Singlebase SDK and Web Components.
 
+## Overview
+**Add user authentication, file uploads and AI chat to any web app, with a single tag each.**
 
-**Add sign-in, file uploads and AI chat to any web app, with a single tag each.**
+**singlebase-js** is the official JavaScript toolkit for
+[Singlebase](https://singlebase.io). 
 
-singlebase-js is the official JavaScript toolkit for
-[Singlebase](https://singlebase.io). It has two parts, and this documentation
-covers both:
+This documentation covers: **Singlebase SDK** & **Web Components**.
 
 - **SDK**: one client for every Singlebase service (auth, data, files, the
   signed-in user and LLM), for when you build your own UI or logic.
