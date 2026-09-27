@@ -337,7 +337,11 @@
         <legend>Behaviour</legend>
         <div class="row"><span>mode</span>
           <span class="seg" data-key="mode">
-            <button data-value="chat">chat</button><button data-value="rag">rag</button>
+            <button data-value="chat">chat</button><button data-value="rag">rag</button><button data-value="kb">kb</button>
+          </span></div>
+        <div class="row"><span>attachments-mode</span>
+          <span class="seg" data-key="attachmentsMode">
+            <button data-value="retrieval">retrieval</button><button data-value="payload">payload</button>
           </span></div>
         <div class="row"><span>format</span>
           <span class="seg" data-key="format">
@@ -386,6 +390,7 @@
           <label><input type="checkbox" data-key="showComposer" /> show-composer</label>
           <label><input type="checkbox" data-key="branding" /> branding</label>
           <label><input type="checkbox" data-key="followups" /> followups</label>
+          <label><input type="checkbox" data-key="saveAttachments" /> save-attachments</label>
           <label><input type="checkbox" data-key="showFollowups" /> show-followups</label>
           <label><input type="checkbox" data-key="allowSearch" /> allow-search</label>
           <label><input type="checkbox" data-key="showSources" /> show-sources</label>
@@ -406,9 +411,8 @@
         <label class="field"><span>prompts <small>(| separated)</small></span><textarea rows="2" data-key="prompts" placeholder="Per-mode defaults · none hides them"></textarea></label>
         <label class="field"><span>logo-url</span><input data-key="logoUrl" placeholder="https://…" /></label>
         <label class="field"><span>bubble-text</span><input data-key="bubbleText" /></label>
+        <label class="field"><span>docsets <small>(comma-separated)</small></span><input data-key="docsets" placeholder="support, billing" /></label>
         <label class="field"><span>footnote <small>(empty hides it)</small></span><input data-key="footnote" /></label>
-        <label class="field"><span>branding-text</span><input data-key="brandingText" placeholder="Chat by Singlebase" /></label>
-        <label class="field"><span>branding-url</span><input data-key="brandingUrl" placeholder="https://singlebase.cloud" /></label>
       </fieldset>
 
       <fieldset>
@@ -556,20 +560,39 @@
                 return { items: store.chats.map(summary) };
               case "get_chat":
                 if (!chat) throw Object.assign(new Error("NOT_FOUND"), { details: { status: 404 } });
-                return { ...summary(chat), messages: chat.messages };
+                return { ...summary(chat), messages: chat.messages, attachments: chat.attachments ?? [] };
               case "chat": {
+                const saved = chat?.attachments ?? [];
+                if (p.mode === "kb" && !p.retrieval?.length && !p.attachments?.length && !saved.length) {
+                  throw Object.assign(new Error("KB_SOURCE_REQUIRED"), { code: "KB_SOURCE_REQUIRED", status: 422 });
+                }
                 let c = chat;
                 if (!c) {
-                  c = { _id: id(), title: p.title, bookmarked: false, messages: [] };
+                  c = { _id: id(), title: p.title, bookmarked: false, messages: [], attachments: [] };
                   store.chats.unshift(c);
                 }
                 c._modified_at = now();
+                // attachments: keep the saved ones on the chat, like the service
+                const attachments = (p.attachments ?? []).map((a) => {
+                  const entry = { type: a.type, name: a.name, mime: a.mime, size: a.size, saved: a.save_attachment !== false, status: "ready" };
+                  if (entry.saved) {
+                    entry._id = id();
+                    c.attachments = [...(c.attachments ?? []), entry];
+                  }
+                  return entry;
+                });
                 const user = { _id: id(), role: "user", content: p.message, _created_at: now() };
-                const reply = answer(currentMode, p.message);
+                const reply = answer(p.mode === "kb" ? "rag" : currentMode, p.message);
                 const bot = { _id: id(), role: "assistant", ...reply, reply_to: user._id, exec_time: 1.2, _created_at: now() };
                 c.messages.push(user, bot);
-                return { _id: c._id, title: c.title, bookmarked: !!c.bookmarked, message: bot };
+                return {
+                  _id: c._id, title: c.title, bookmarked: !!c.bookmarked, message: bot,
+                  ...(attachments.length ? { attachments } : {})
+                };
               }
+              case "remove_chat_attachment":
+                if (chat) chat.attachments = (chat.attachments ?? []).filter((a) => a._id !== p.attachment_id);
+                return { _id: p.attachment_id, chat_id: p._id, deleted: true };
               case "generate":
                 return { result: '"' + p.user_input.split("\n")[0].replace(/^user:\s*/, "").slice(0, 28) + '"' };
               case "update_chat":
@@ -618,6 +641,9 @@
         showComposer: true,
         branding: true,
         followups: true,
+        attachmentsMode: "payload",
+        saveAttachments: true,
+        docsets: "",
         showFollowups: true,
         allowSearch: true,
         showSources: true,
@@ -633,9 +659,7 @@
         prompts: "",
         logoUrl: "",
         bubbleText: "Hi, questions about sign-in or the API? Ask me here.",
-        footnote: "Acme Assistant can make mistakes. Check important details.",
-        brandingText: "",
-        brandingUrl: ""
+        footnote: "Acme Assistant can make mistakes. Check important details."
       };
       const state = { ...DEFAULTS };
       const stage = document.getElementById("stage");
@@ -650,7 +674,7 @@
 
       /** The attributes that differ from the element's own defaults. */
       function markup() {
-        const ELEMENT_DEFAULTS = { ...DEFAULTS, format: "advanced", allowRaw: false, footnote: undefined, greetingBubble: false, unreadBadge: false, assistantName: "Assistant", bubbleText: "" };
+        const ELEMENT_DEFAULTS = { ...DEFAULTS, attachmentsMode: "retrieval", format: "advanced", allowRaw: false, footnote: undefined, greetingBubble: false, unreadBadge: false, assistantName: "Assistant", bubbleText: "" };
         const attrs = [];
         for (const [key, value] of Object.entries(state)) {
           if (key === "accent" || value === ELEMENT_DEFAULTS[key]) continue;

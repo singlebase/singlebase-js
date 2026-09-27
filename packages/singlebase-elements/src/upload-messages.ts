@@ -47,8 +47,6 @@ export interface SinglebaseUploadMessages {
   errUpload: string;
   errProtected: string;
   errTooManyPages: string;
-
-  brandingLabel: string;
 }
 
 export const defaultUploadMessages: SinglebaseUploadMessages = {
@@ -87,9 +85,7 @@ export const defaultUploadMessages: SinglebaseUploadMessages = {
   errNoClient: "No Singlebase client found on this page.",
   errUpload: "Upload failed.",
   errProtected: "{name} is password protected.",
-  errTooManyPages: "{name} has {pages} pages; the limit is {max}.",
-
-  brandingLabel: "Files by Singlebase"
+  errTooManyPages: "{name} has {pages} pages; the limit is {max}."
 };
 
 export function resolveUploadMessages(

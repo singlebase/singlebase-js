@@ -135,8 +135,6 @@ actual sign-in, not on a restored session.
 | `logo-url` / `logo-text` | — | Your mark. `logo-text` becomes the image's alt |
 | `brand-line` / `brand-foot` | — | Copy for the split panel |
 | `sign-in-title` | — | Replace the sign-in heading |
-| `branding` | on | The "Auth by Singlebase" credit. `="false"` to hide. It makes no request |
-| `branding-text` / `branding-url` | — | The credit's text and link (http(s) only). Same on every Singlebase element |
 | `invite-email` / `invite-org` / `invite-code` | — | Prefill the invite screen |
 | `nonce-storage-key` | `singlebase-oauth-nonce` | Where the OAuth nonce is kept |
 | `theme` / `density` / `field-style` / `radius` | — | See [Theming](#theming) |
@@ -331,7 +329,7 @@ singlebase-authui::part(button-primary) { text-transform: uppercase; }
 
 `title`, `input`, `button-primary`, `button-signout`, `banner`, `notice`,
 `consent`, `spinner`, `code-box`, `oauth-button`, `acc-item`, `logo`,
-`branding`, `avatar`, `avatar-image`, `avatar-initials`, `text`.
+`avatar`, `avatar-image`, `avatar-initials`, `text`.
 
 ---
 

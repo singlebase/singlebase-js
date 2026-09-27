@@ -1,0 +1,1 @@
+- [] In chat, Add indication in a response, to receive additional chat, by passing a key, could be from additional background. 

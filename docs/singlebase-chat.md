@@ -8,7 +8,7 @@ saved on the server and scoped to the signed-in user.
 <singlebase-chat></singlebase-chat>
 ```
 
-**Contents:** [Load](#load) · [Embeds](#embeds) · [Modes](#modes) · [Conversations](#conversations) · [Attachments](#attachments) · [Rendering](#rendering) · [Welcome screen](#welcome-screen) · [Configure from script](#configure-from-script) · [Extending](#extending) · [Events](#events) · [Reference](#reference) · [Backend notes](#backend-notes)
+**Contents:** [Load](#load) · [Embeds](#embeds) · [Modes](#modes) · [Conversations](#conversations) · [Attachments](#attachments) · [Rendering](#rendering) · [Welcome screen](#welcome-screen) · [Configure from script](#configure-from-script) · [Extending](#extending) · [Events](#events) · [Reference](#reference) · [Service support](#service-support)
 
 ---
 
@@ -24,10 +24,10 @@ SinglebaseClient({ apiKey: "wk_YOUR_WEB_KEY" });
 The chat uses the page's `SinglebaseClient()`, and the signed-in user's token
 goes with every request. Conversations belong to a user, so put the chat
 behind sign-in, for example inside a
-[`<singlebase-authui-guard>`](./SBC-AUTHUI.md). To target another client, set
+[`<singlebase-authui-guard>`](./singlebase-authui.md#singlebase-authui-guard). To target another client, set
 `el.client`.
 
-With no build step, the [script-tag bundle](./SBC-AUTHUI.md#load) includes it.
+With no build step, the [script-tag bundle](./singlebase-authui.md#load) includes it.
 
 ---
 
@@ -81,28 +81,47 @@ panel, drawer or expanded view.
 `mode` decides how the model answers; there's no mode switch in the UI. How
 visual the answers can be is [`format`](#rendering)'s job, not the mode's.
 
-| Mode | Answers | Sends when a chat is created |
-| --- | --- | --- |
-| `chat` (default) | Free-form | "Be helpful and concise…" |
-| `rag` | Only from the sources, with `[n]` after each claim | "Answer ONLY from the sources…" |
+| Mode | Answers |
+| --- | --- |
+| `chat` (default) | Free-form. Sources, if any, are optional background |
+| `rag` | From the sources first, with `[n]` after each claim; may add general knowledge, saying so |
+| `kb` | **Only** from the knowledge sources (docsets, retrieval, attachments). Otherwise it says it can't find the answer |
 
-The instructions go in `system_message` on the chat's first turn, followed by
-what the `format` level allows (charts, for instance, need `format="rich"`).
-Add your own with `system-message`; it's sent first.
+The mode is sent with every message (`payload.mode`), and the service applies
+the matching rule. The chat's own instructions go in `system_message` on the
+first turn, followed by what the `format` level allows (charts, for instance,
+need `format="rich"`). Add your own with `system-message`; it's sent first.
 
-**RAG** needs sources. Pass them with `retrieval`; they go with every turn:
+A `kb` chat with no knowledge source configured is refused by the service
+(`KB_SOURCE_REQUIRED`); the chat shows "No knowledge base is set up for this
+chat." and fires `singlebase-chat-error` with that code.
+
+**Docsets** are knowledge scopes the developer sets up on the service (a set
+of collections, optionally narrowed to documents or a filter). A public chat
+picks them by slug or id; the browser never names collections itself:
+
+```html
+<singlebase-chat mode="kb" docsets="support, billing"></singlebase-chat>
+```
+
+They're sent as `{ source: "docset", ids: [...] }`, ahead of anything in
+`retrieval`.
+
+**Retrieval** passes any other source through as written. It's sent with every
+message; the service keeps it on the chat and reuses what it already fetched:
 
 ```html
 <singlebase-chat mode="rag"
-  retrieval='[{"type":"kdb","namespace":"help-center"}]'></singlebase-chat>
+  retrieval='[{"source":"json","data":{"plan":"Pro","seats":12}}]'></singlebase-chat>
 ```
 
-Any [retrieval type](./README.md#sbcllm--language-models) works (`kdb`, `vector`,
-`docs`, `json`, `csv`, `s3`…). Sources the server recorded on a reply show as a
-collapsible **Searched n sources** row with relevance bars, as cards under the
-answer, and as numbered chips in the text. A chip or card opens the source panel
-with the passage, its path, **Copy** (the passage with its reference), and the
-other cited sources.
+Web keys may use `docset`, `docs`, `json`, `csv`, `data` and `attachments`;
+`kdb`, `vector`, `s3` and `generate` need a server key.
+
+**Cited sources** show three ways: a collapsible **Searched n sources** row
+with relevance bars, cards under the answer, and numbered chips in the text. A
+chip or card opens the source panel with the passage, its path, **Copy** (the
+passage with its reference), and the other cited sources.
 
 ---
 
@@ -114,7 +133,7 @@ conversation:
 
 | Feature | How |
 | --- | --- |
-| Chat list | `llm.list_chats`, grouped Bookmarked / Today / Yesterday / Previous 7 days / Older, with search |
+| Chat list | `llm.list_chats`, grouped Bookmarked / Today / Yesterday / Previous 7 days / Older, with search. Opening or using a chat doesn't reorder it; a new chat appears on top |
 | Open a chat | `llm.get_chat` (system messages are hidden) |
 | Title | The first message until the reply lands, then 3–6 words from `llm.generate`, saved with `llm.update_chat`. `auto-title="false"` keeps the first message |
 | Rename | Click the title, or the pencil on a list row. A renamed chat is never retitled |
@@ -139,11 +158,23 @@ error card with **Retry**. 👍 / 👎 fire an event; they aren't stored.
 ## Attachments
 
 The paperclip, or a drop anywhere on the conversation, attaches up to 5 text
-files (`.md`, `.txt`, `.csv`, `.json`, `.html`, `.yaml`, `.xml`, `.log`; 512 KB
-each). They're read in the browser and sent as `retrieval` with that one
+files (`.md`, `.txt`, `.csv`, `.tsv`, `.json`, `.html`, `.yaml`, `.xml`, `.log`;
+512 KB each). They're read in the browser and sent as `retrieval` with that one
 message: CSV as `csv`, JSON as `json`, the rest as `docs`. Their names are
 stored in the message's `metadata.attachments`. `allow-upload="false"` hides
 the control.
+
+Retrieval lasts one turn, so a later message doesn't include the file; the
+model only has what it said about it in its reply.
+
+**Keep files on the chat** with `attachments-mode="payload"`. Files are then
+sent once as `attachments` (`{ type: "content", content, name, mime, size,
+save_attachment }`), and the service keeps them on the chat and uses them on
+later turns. They show above the composer marked **In this chat**, come back
+when the chat is reopened, and × removes one (`llm.remove_chat_attachment`).
+A file the service couldn't read is named in a notice.
+`save-attachments="false"` sends them for that message only. This needs a
+service that supports attachments; the default `retrieval` works everywhere.
 
 ---
 
@@ -280,7 +311,7 @@ chat.configure({
   client: sbc,                                   // default: the page's SinglebaseClient()
   mode: "rag",
   format: "rich",
-  retrieval: [{ type: "kdb", namespace: "help-center" }],
+  docsets: ["support"],
   prompts: [{ label: "Billing", text: "How do refunds work?" }],
   assistantName: "Acme Assistant",
   chatId: "chat_8f2k1"                           // opens this saved chat
@@ -332,7 +363,7 @@ chat.beforeSend = async (payload, { chatId, isNew, message }) => {
   if (/password/i.test(payload.message)) return false;          // don't send it
   payload.message = payload.message.replace(/\b\d{16}\b/g, "[card]");
   payload.metadata = { ...payload.metadata, page: location.pathname };
-  payload.retrieval = [...(payload.retrieval ?? []), { type: "json", data: await pageContext() }];
+  payload.retrieval = [...(payload.retrieval ?? []), { source: "json", data: await pageContext() }];
   return payload;
 };
 ```
@@ -371,7 +402,7 @@ chat.client = {
         // Ground every turn in whatever the user is looking at right now.
         payload = {
           ...payload,
-          retrieval: [...(payload.retrieval ?? []), { type: "json", data: currentPageContext() }]
+          retrieval: [...(payload.retrieval ?? []), { source: "json", data: currentPageContext() }]
         };
       }
       return sbc.llm.call(method, payload, options);
@@ -432,7 +463,8 @@ Events bubble out of the shadow DOM.
 | Attribute | Default | |
 | --- | --- | --- |
 | `embed` | `page` | `page`, `inline` or `launcher` |
-| `mode` | `chat` | `chat` or `rag` |
+| `mode` | `chat` | `chat`, `rag` or `kb` |
+| `docsets` | — | Docset slugs or ids to answer from, comma-separated |
 | `format` | `advanced` | `raw`, `plain`, `advanced` or `rich` ([rendering](#rendering)) |
 | `allow-raw` | off | A per-reply toggle to the text as written |
 | `glow` | `subtle` | AI glow: `subtle`, `vivid` or `off` |
@@ -441,6 +473,8 @@ Events bubble out of the shadow DOM.
 | `system-message` | — | Extra instructions, sent when a chat is created |
 | `metadata` | — | Stored on each user message, never sent to the model (JSON) |
 | `followups` | on | Ask the model for follow-up questions |
+| `attachments-mode` | `retrieval` | `retrieval` (files go with one message) or `payload` (the service keeps them on the chat) |
+| `save-attachments` | on | With `attachments-mode="payload"`: keep files on the chat |
 | `show-followups` | on | Show them under the latest reply |
 | `show-sources` | on | The "Cited sources" cards and "Searched n sources" row under answers (the `[n]` chips stay) |
 | `show-new-chat` | on | The New chat button |
@@ -468,10 +502,8 @@ Events bubble out of the shadow DOM.
 | `show-time` | on | Message times |
 | `show-composer` | on | The message box. `="false"` shows only the conversation; with `chat-id`, a read-only view of a saved chat |
 | `footnote` | "{name} can make mistakes…" | The line under the composer. `footnote=""` hides it |
-| `branding` | on | The "Chat by Singlebase" credit. It makes no request |
-| `branding-text` / `branding-url` | — | The credit's text and link (http(s) only). Same on every Singlebase element |
 | `theme` | — | `light` or `dark` |
-| `radius` | — | `sharp`, `default` or `round`, for this element only ([corners](./SBC-AUTHUI.md#theming)) |
+| `radius` | — | `sharp`, `default` or `round`, for this element only ([corners](./singlebase-authui.md#theming)) |
 
 ### Properties and methods
 
@@ -485,6 +517,7 @@ Events bubble out of the shadow DOM.
 | `beforeSend` | `(payload, { chatId, isNew, message }) => payload \| false`, before each message is sent |
 | `afterParse` | `(blocks, { message, format }) => blocks`, before a reply is drawn |
 | `chatId` / `thread` / `chats` | The open chat's id, its messages, and the loaded list |
+| `attachments` | Files the service keeps on the open chat (`attachments-mode="payload"`) |
 | `send(text)` | Send a message (no argument sends the composer's text) |
 | `newChat()` / `openChat(id)` | Start a chat / open a saved one |
 | `stop()` | Stop the current reply |
@@ -498,25 +531,25 @@ It uses the same `--sb-*` tokens as AuthUI, plus `--sb-hover`, `--sb-ink-2` and
 `--sb-divider`. Corners follow `--sb-radius` × `--sb-radius-scale`, like the
 other elements. `--sb-accent` colours the send button, the launcher and the
 relevance bars; `--sb-chat-z` sets the launcher's stacking order. The parts are
-`frame`, `sidebar`, `sidebar-extra` (around the slot), `header`, `title`, `messages`, `message`, `answer`, `chart`,
-`table`, `json`, `svg`, `callout`,
-`welcome`, `prompt`, `composer`, `footnote`, `panel`, `launcher`, `bubble` and `branding`.
+`frame`, `sidebar`, `sidebar-extra` (around the slot), `header`, `title`,
+`messages`, `message`, `answer`, `chart`, `table`, `json`, `svg`, `callout`,
+`welcome`, `prompt`, `composer`, `footnote`, `panel`, `launcher` and `bubble`.
 
 ### Without the element
 
-It's all `sbc.llm.*`. See the [README](./README.md#sbcllm--language-models) for
-the operations.
+It's all `sbc.llm.*`. See [LLM in the SDK guide](./sdk.md#sbcllm--language-models)
+for the operations.
 
 ---
 
-## Backend notes
+## Service support
 
-Two service changes would make the chat better. Both are written up, with the
-exact response shapes, in [docs/chat-backend-notes.md](./docs/chat-backend-notes.md):
+Sources come back numbered and normalized (`n`, `section`, `score`…), and the
+chat uses them as they are.
 
-- **A stable `sources` shape**, numbered to match the `[n]` in the reply. The
-  chat reads whatever the server returns today, guessing field names.
-- **Server-side follow-ups** (`followups: true` → `message.followups`), so the
-  `FOLLOWUPS:` line no longer ends up in the stored text.
+A few options depend on service updates that are rolling out
+([details](./chat-backend-notes.md)):
 
-The chat will keep working with today's service either way.
+- `docsets` and `attachments-mode="payload"` need the updated service.
+- Until the service applies `mode` itself, `mode="kb"` is enforced by the
+  chat's own instructions.

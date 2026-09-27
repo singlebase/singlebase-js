@@ -289,6 +289,214 @@ describe("<singlebase-chat> sources", () => {
   });
 });
 
+describe("<singlebase-chat> knowledge and service features", () => {
+  const chatPayloads = (client: ReturnType<typeof llmClient>) =>
+    client.calls.filter((c) => c.method === "chat").map((c) => c.payload);
+
+  it("sends the mode on every turn; kb gets its own welcome and strict instructions", async () => {
+    const client = llmClient();
+    const el = await mount(
+      html`<singlebase-chat mode="kb" auto-title="false"></singlebase-chat>`,
+      client
+    );
+    expect($(el, ".welcome h2")!.textContent).to.equal("Ask the knowledge base");
+    expect(($(el, "textarea.input") as HTMLTextAreaElement).placeholder).to.equal(
+      "Ask the knowledge base…"
+    );
+
+    await el.send("Where is the refund policy?");
+    await until(settled(el));
+    await el.send("And for annual plans?");
+    await until(() => el.thread.length === 4 && settled(el)());
+    const [first, second] = chatPayloads(client);
+    expect(first.mode).to.equal("kb");
+    expect(second.mode).to.equal("kb");
+    expect(first.system_message).to.contain("Do not use outside knowledge");
+  });
+
+  it("explains a kb chat with no knowledge source", async () => {
+    const client = llmClient({
+      chat: () => {
+        throw Object.assign(new Error("KB_SOURCE_REQUIRED"), {
+          code: "KB_SOURCE_REQUIRED",
+          status: 422
+        });
+      }
+    });
+    const el = await mount(html`<singlebase-chat mode="kb"></singlebase-chat>`, client);
+    const errors: any[] = [];
+    el.addEventListener("singlebase-chat-error", (e) => errors.push((e as CustomEvent).detail));
+    await el.send("hello");
+    await until(settled(el));
+    await el.updateComplete;
+    expect($(el, ".error-card")!.textContent).to.contain("No knowledge base is set up");
+    expect(errors[0].code).to.equal("KB_SOURCE_REQUIRED");
+  });
+
+  it("docsets become a docset retrieval source, ahead of the retrieval option", async () => {
+    const client = llmClient();
+    const el = await mount(
+      html`<singlebase-chat
+        docsets="support, billing support"
+        retrieval='[{"type":"kdb","namespace":"faq"}]'
+        auto-title="false"
+      ></singlebase-chat>`,
+      client
+    );
+    await el.send("q");
+    await until(settled(el));
+    expect(chatPayloads(client)[0].retrieval).to.deep.equal([
+      { source: "docset", ids: ["support", "billing"] },
+      { type: "kdb", namespace: "faq" }
+    ]);
+
+    el.configure({ docsets: ["one"] });
+    await el.send("again");
+    await until(() => el.thread.length === 4 && settled(el)());
+    expect(chatPayloads(client)[1].retrieval[0]).to.deep.equal({ source: "docset", ids: ["one"] });
+  });
+
+  it("uses the service's source numbers and sections", async () => {
+    const client = llmClient({
+      chat: () => ({
+        _id: "c1",
+        message: {
+          _id: "a1",
+          reply_to: "u1",
+          content: "Codes last 10 minutes [2].",
+          sources: [
+            {
+              n: 2,
+              source: "kdb",
+              type: "kdb",
+              title: "Codes",
+              section: "Expiry",
+              content: "Ten minutes.",
+              collection: "help"
+            }
+          ]
+        }
+      })
+    });
+    const el = await mount(
+      html`<singlebase-chat mode="rag" auto-title="false"></singlebase-chat>`,
+      client
+    );
+    await el.send("q");
+    await until(settled(el));
+    await el.updateComplete;
+    const chip = $(el, ".cite") as HTMLButtonElement;
+    expect(chip.textContent).to.equal("2");
+    expect($(el, ".source-card .t")!.textContent).to.equal("Codes · Expiry");
+    chip.click();
+    await el.updateComplete;
+    expect($(el, ".panel h3")!.textContent).to.equal("Codes");
+    expect($(el, ".panel .meta")!.textContent).to.equal("Expiry");
+    expect($(el, ".panel .path")).to.equal(null); // "kdb" is the kind, not a path
+  });
+
+  it("attachments-mode=payload sends files as attachments and shows what the chat keeps", async () => {
+    const client = llmClient({
+      chat: (p) => ({
+        _id: "c1",
+        message: { _id: "a1", reply_to: "u1", content: "ok" },
+        attachments: (p.attachments ?? []).map((a: any, i: number) =>
+          a.name === "bad.txt"
+            ? {
+                type: "content",
+                name: a.name,
+                saved: false,
+                status: "failed",
+                error: "ATTACHMENT_TOO_LARGE"
+              }
+            : { _id: `f${i}`, type: "content", name: a.name, saved: true, status: "ready" }
+        )
+      }),
+      get_chat: () => ({
+        _id: "c1",
+        title: "t",
+        messages: [],
+        attachments: [
+          { _id: "f0", type: "content", name: "notes.md", saved: true, status: "ready" }
+        ]
+      })
+    });
+    const el = await mount(
+      html`<singlebase-chat attachments-mode="payload" auto-title="false"></singlebase-chat>`,
+      client
+    );
+    await (el as any).addFiles([
+      new File(["# hi"], "notes.md", { type: "text/markdown" }),
+      new File(["x"], "bad.txt", { type: "text/plain" })
+    ]);
+    await el.send("Read these");
+    await until(settled(el));
+    await el.updateComplete;
+
+    const payload = chatPayloads(client)[0];
+    expect(payload.retrieval).to.equal(undefined);
+    expect(payload.metadata).to.equal(undefined);
+    expect(payload.attachments).to.deep.equal([
+      {
+        type: "content",
+        content: "# hi",
+        name: "notes.md",
+        mime: "text/markdown",
+        size: 4,
+        save_attachment: true
+      },
+      {
+        type: "content",
+        content: "x",
+        name: "bad.txt",
+        mime: "text/plain",
+        size: 1,
+        save_attachment: true
+      }
+    ]);
+    expect(el.attachments.map((a) => a.name)).to.deep.equal(["notes.md"]);
+    expect($(el, ".pending-file.kept .size")!.textContent).to.equal("In this chat");
+    expect($(el, ".toast")!.textContent).to.contain("Couldn't read bad.txt");
+
+    // later turns don't resend the file
+    await el.send("And then?");
+    await until(() => el.thread.length === 4 && settled(el)());
+    expect(chatPayloads(client)[1].attachments).to.equal(undefined);
+
+    // removing asks the service
+    ($(el, 'button[aria-label="Remove from this chat"]') as HTMLButtonElement).click();
+    await el.updateComplete;
+    expect(el.attachments).to.have.length(0);
+    expect(client.calls.find((c) => c.method === "remove_chat_attachment")!.payload).to.deep.equal({
+      _id: "c1",
+      attachment_id: "f0"
+    });
+
+    // reopening a chat lists what it keeps; a new chat starts empty
+    await el.openChat("c1");
+    await el.updateComplete;
+    expect(el.attachments.map((a) => a.id)).to.deep.equal(["f0"]);
+    el.newChat();
+    expect(el.attachments).to.have.length(0);
+  });
+
+  it("save-attachments=false sends files for this turn only", async () => {
+    const client = llmClient();
+    const el = await mount(
+      html`<singlebase-chat
+        attachments-mode="payload"
+        save-attachments="false"
+        auto-title="false"
+      ></singlebase-chat>`,
+      client
+    );
+    await (el as any).addFiles([new File(["x"], "a.txt", { type: "text/plain" })]);
+    await el.send("q");
+    await until(settled(el));
+    expect(chatPayloads(client)[0].attachments[0].save_attachment).to.equal(false);
+  });
+});
+
 describe("<singlebase-chat> format levels", () => {
   const reply = [
     "Lead.",
@@ -442,6 +650,43 @@ describe("<singlebase-chat> history", () => {
     expect(client.calls.find((c) => c.method === "list_chats")!.payload).to.deep.equal({
       limit: 100
     });
+  });
+
+  it("opening or messaging a chat never reorders the list", async () => {
+    const old = new Date(Date.now() - 3 * 86_400_000).toISOString();
+    const client = llmClient({
+      list_chats: () => ({
+        items: [
+          { _id: "c1", title: "First", _modified_at: old },
+          { _id: "c2", title: "Second", _modified_at: old },
+          { _id: "c3", title: "Third", _modified_at: old }
+        ]
+      }),
+      get_chat: (p) => ({
+        _id: p._id,
+        title: "Third",
+        _modified_at: new Date().toISOString(),
+        messages: []
+      }),
+      chat: (p) => ({ _id: p._id, message: { _id: "a1", reply_to: "u1", content: "ok" } })
+    });
+    const el = await mount(
+      html`<singlebase-chat sidebar auto-title="false"></singlebase-chat>`,
+      client
+    );
+    const order = () => $$(el, ".thread-title").map((t) => t.textContent);
+    await until(() => order().length === 3);
+
+    await el.openChat("c3");
+    await el.send("hello");
+    await until(settled(el));
+    await el.updateComplete;
+    // opening a chat closes a drawer-style list; open it again to look
+    ($(el, 'button[aria-label="Show chats"]') as HTMLButtonElement | null)?.click();
+    await el.updateComplete;
+    expect(el.chats.map((c) => c.title)).to.deep.equal(["First", "Second", "Third"]);
+    expect(order()).to.deep.equal(["First", "Second", "Third"]);
+    expect($$(el, ".group").map((g) => g.textContent)).to.deep.equal(["Previous 7 days"]);
   });
 
   it("opens a saved chat and hides system messages", async () => {

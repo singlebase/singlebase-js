@@ -16,6 +16,7 @@ export type {
   ChatMessage,
   ChatMode,
   ChatPrompt,
+  ChatSavedAttachment,
   ChatSidebar,
   ChatSummary
 } from "./elements/chat.js";

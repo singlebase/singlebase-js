@@ -30,7 +30,11 @@ import { svgDataUrl } from "../utils/svg.js";
 
 // ── public types ───────────────────────────────────────────
 
-export type ChatMode = "chat" | "rag";
+/**
+ * How answers use sources: `chat` free-form, `rag` prefers sources and cites
+ * them, `kb` answers only from sources (docsets, retrieval, attachments).
+ */
+export type ChatMode = "chat" | "rag" | "kb";
 export type ChatEmbed = "page" | "inline" | "launcher";
 export type ChatGlow = "subtle" | "vivid" | "off";
 export type ChatExportFormat = "md" | "txt" | "json" | "copy";
@@ -63,6 +67,17 @@ export interface ChatAttachment {
   name: string;
   size: number;
   content: string;
+  mime?: string;
+}
+
+/** A file the service keeps on the chat (attachments-mode="payload"). */
+export interface ChatSavedAttachment {
+  id: string;
+  name: string;
+  type?: string;
+  mime?: string;
+  size?: number;
+  status?: string;
 }
 
 export interface ChatMessage {
@@ -153,10 +168,11 @@ export interface ChatConfig {
   showTime: boolean;
   showComposer: boolean;
   footnote: string;
-  brandingText: string;
-  brandingUrl: string;
   branding: boolean;
   followups: boolean;
+  docsets: string | string[];
+  attachmentsMode: "retrieval" | "payload";
+  saveAttachments: boolean;
   showFollowups: boolean;
   showSources: boolean;
   showNewChat: boolean;
@@ -205,10 +221,11 @@ const CONFIG_KEYS: readonly (keyof ChatConfig)[] = [
   "showTime",
   "showComposer",
   "footnote",
-  "brandingText",
-  "brandingUrl",
   "branding",
   "followups",
+  "docsets",
+  "attachmentsMode",
+  "saveAttachments",
   "showFollowups",
   "showSources",
   "showNewChat",
@@ -291,9 +308,12 @@ const CHART_COLORS = [
 const MODE_PROMPTS: Record<ChatMode, string> = {
   chat: "Be helpful and concise. Use Markdown when it helps: headings, lists, **bold**, code blocks and tables.",
   rag:
+    "Prefer the sources provided with each message, numbered in the order given, and put a citation like [1] right after each claim they support. " +
+    "If they don't cover the question, you may answer from general knowledge, but say clearly that it isn't from the sources.",
+  kb:
     "Answer ONLY from the sources provided with each message, numbered in the order given. " +
-    "Put a citation like [1] right after each claim it supports. " +
-    "If the sources don't cover the question, say so plainly."
+    "Put a citation like [1] right after each claim. Do not use outside knowledge. " +
+    "If the sources don't contain the answer, say that you can't find it in the available sources."
 };
 
 /** What the model may write at each format level, so it only uses what renders. */
@@ -333,6 +353,12 @@ const DEFAULT_PROMPTS: Record<ChatMode, [string, string][]> = {
     ["Summarize", "Summarize the most important points"],
     ["Find", "Where is the refund policy described?"],
     ["Explain", "Explain the setup steps in plain language"]
+  ],
+  kb: [
+    ["Find", "Where is the refund policy described?"],
+    ["How to", "How do I reset my password?"],
+    ["Limits", "What are the plan limits?"],
+    ["Policy", "What happens when my account is deleted?"]
   ]
 };
 
@@ -443,15 +469,33 @@ export function describeSource(source: Record<string, unknown>, n: number) {
     JSON.stringify(s, null, 2);
   const score = [s.score, s.relevance, s._score, meta.score].find((v) => typeof v === "number") as
     number | undefined;
+  const number = typeof s.n === "number" && s.n > 0 ? s.n : n;
   return {
-    n,
-    title: pick(s.title, s.name, s.filename, meta.title, meta.name) ?? `Source ${n}`,
-    path: pick(s.path, s.url, s.key, s.source, meta.path, meta.url) ?? "",
+    n: number,
+    title: pick(s.title, s.name, s.filename, meta.title, meta.name) ?? `Source ${number}`,
+    section: pick(s.section, s.heading, meta.section) ?? "",
+    path: pick(s.path, s.url, s.key, meta.path, meta.url) ?? "",
     collection: pick(s.collection, s.namespace, s.dbname, meta.collection) ?? "",
     updated: pick(s.updated, s._modified_at, meta.updated) ?? "",
     text,
     score: score === undefined ? null : Math.max(0, Math.min(1, score))
   };
+}
+
+/** The saved entries of a service `attachments` list. */
+function toSavedFiles(list: unknown): ChatSavedAttachment[] {
+  if (!Array.isArray(list)) return [];
+  return list
+    .filter((item) => item && typeof item === "object" && (item._id || item.id))
+    .filter((item) => item.saved !== false && item.status !== "failed")
+    .map((item) => ({
+      id: String(item._id ?? item.id),
+      name: String(item.name ?? "file"),
+      type: item.type,
+      mime: item.mime,
+      size: typeof item.size === "number" ? item.size : undefined,
+      status: item.status
+    }));
 }
 
 function toRetrieval(files: ChatAttachment[]): Record<string, unknown>[] {
@@ -546,6 +590,23 @@ export class SinglebaseChat extends LitElement {
   @property({ attribute: false }) accessor afterParse: ChatAfterParse | null = null;
 
   @property({ reflect: true }) accessor glow: ChatGlow = "subtle";
+
+  /**
+   * Docsets to answer from: slugs or ids, comma-separated in markup or an
+   * array in JavaScript. Sent as `{ source: "docset", ids }`.
+   */
+  @property() accessor docsets: string | string[] = "";
+
+  /**
+   * How attached files reach the service: `retrieval` (this message only;
+   * works with every service version) or `payload` (as `attachments`, which
+   * the service keeps on the chat for later turns).
+   */
+  @property({ attribute: "attachments-mode" }) accessor attachmentsMode: "retrieval" | "payload" =
+    "retrieval";
+
+  /** With attachments-mode="payload": keep attached files on the chat. */
+  @property({ converter: flagAttr, attribute: "save-attachments" }) accessor saveAttachments = true;
 
   /** Ask the model for follow-up questions with each reply. */
   @property({ converter: flagAttr }) accessor followups = true;
@@ -662,12 +723,6 @@ export class SinglebaseChat extends LitElement {
   /** The "Chat by Singlebase" credit. A plain link — it makes no request. */
   @property({ converter: flagAttr }) accessor branding = true;
 
-  /** The credit's text. Empty uses the element's default ("… by Singlebase"). */
-  @property({ attribute: "branding-text" }) accessor brandingText = "";
-
-  /** Where the credit links to. Only http(s); anything else uses singlebase.cloud. */
-  @property({ attribute: "branding-url" }) accessor brandingUrl = "";
-
   // ── state ─────────────────────────────────────────────────
   @state() private accessor chatList: ChatSummary[] = [];
   @state() private accessor listState: "idle" | "loading" | "ready" | "error" = "idle";
@@ -693,6 +748,7 @@ export class SinglebaseChat extends LitElement {
   @state() private accessor copiedKey = "";
   @state() private accessor retrievalOpen = new Set<string>();
   @state() private accessor rawKeys = new Set<string>();
+  @state() private accessor savedFiles: ChatSavedAttachment[] = [];
   @state() private accessor hasSidebarContent = false;
   @state() private accessor sorts = new Map<string, { col: number; dir: 1 | -1 }>();
   @state() private accessor arrivedKey = "";
@@ -739,6 +795,18 @@ export class SinglebaseChat extends LitElement {
   }
 
   /** `format`, falling back to the default for anything unknown. */
+  /** `docsets` as a clean list of ids. */
+  private get docsetIds(): string[] {
+    const value = this.docsets;
+    const list = Array.isArray(value) ? value : String(value ?? "").split(/[\s,]+/);
+    return [...new Set(list.map((id) => String(id).trim()).filter(Boolean))];
+  }
+
+  /** The files this chat keeps on the service. */
+  get attachments(): readonly ChatSavedAttachment[] {
+    return this.savedFiles;
+  }
+
   private get formatLevel(): ChatFormat {
     return (["raw", "plain", "advanced", "rich"] as const).includes(this.format)
       ? this.format
@@ -909,6 +977,7 @@ export class SinglebaseChat extends LitElement {
   newChat(): void {
     this.halt();
     this.pendingChatId = "";
+    this.savedFiles = [];
     this.loadingThread = false;
     this.activeId = null;
     this.chatTitle = "";
@@ -924,6 +993,7 @@ export class SinglebaseChat extends LitElement {
     const client = this.resolvedClient;
     if (!id) return;
     this.halt();
+    this.savedFiles = [];
     const summary = this.chatList.find((chat) => chat._id === id);
     this.activeId = id;
     this.chatTitle = summary?.title ?? "";
@@ -952,6 +1022,7 @@ export class SinglebaseChat extends LitElement {
       this.msgs = (data?.messages ?? [])
         .filter((m) => m && (m.role === "user" || m.role === "assistant"))
         .map((m) => this.fromServer(m));
+      this.savedFiles = toSavedFiles((data as { attachments?: unknown })?.attachments);
       this.upsertChat({ ...summary, ...data, _id: id } as ChatSummary);
       this.stick = true;
       void this.scrollToBottom();
@@ -1158,15 +1229,36 @@ export class SinglebaseChat extends LitElement {
       payload.title = provisionalTitle(user.content);
       payload.system_message = this.systemPrompt();
     }
+    payload.mode = this.mode;
     if (this.model) payload.model = this.model;
     if (Object.keys(this.params ?? {}).length) payload.params = this.params;
 
-    const names = (user.attachments ?? []).map((file) => file.name);
+    // Files go either as this turn's retrieval (works everywhere) or, with
+    // attachments-mode="payload", as attachments the service keeps on the chat.
+    const files = user.attachments ?? [];
+    const asPayload = this.attachmentsMode === "payload";
+    if (asPayload && files.length) {
+      payload.attachments = files.map((file) => ({
+        type: "content",
+        content: file.content,
+        name: file.name,
+        ...(file.mime ? { mime: file.mime } : {}),
+        size: file.size,
+        save_attachment: this.saveAttachments
+      }));
+    }
+
+    const names = asPayload ? [] : files.map((file) => file.name);
     if (Object.keys(this.metadata ?? {}).length || names.length) {
       payload.metadata = { ...this.metadata, ...(names.length ? { attachments: names } : {}) };
     }
 
-    const retrieval = [...(this.retrieval ?? []), ...toRetrieval(user.attachments ?? [])];
+    const docsets = this.docsetIds;
+    const retrieval = [
+      ...(docsets.length ? [{ source: "docset", ids: docsets }] : []),
+      ...(this.retrieval ?? []),
+      ...(asPayload ? [] : toRetrieval(files))
+    ];
     if (retrieval.length) payload.retrieval = retrieval;
     return payload;
   }
@@ -1257,8 +1349,6 @@ export class SinglebaseChat extends LitElement {
       if (isNew) {
         this.chatTitle = data?.title || (payload.title as string);
         this.bookmarked = !!data?.bookmarked;
-      } else if (chatId) {
-        this.touchChat(chatId);
       }
 
       const reply = data?.message ?? {};
@@ -1270,6 +1360,7 @@ export class SinglebaseChat extends LitElement {
             : "";
       const { text, followups } = splitFollowups(raw);
       user.id = reply.reply_to ?? null;
+      this.applyAttachmentResults(data?.attachments);
       Object.assign(bot, {
         id: reply._id ?? null,
         content: text,
@@ -1290,7 +1381,13 @@ export class SinglebaseChat extends LitElement {
         this.chatList = this.chatList.filter((chat) => chat._id !== this.activeId);
         this.activeId = null;
       }
-      this.failTurn(bot, notFound ? this.msg.errNotFound : this.msg.errGeneric, errorCode(error));
+      const code = errorCode(error);
+      const message = notFound
+        ? this.msg.errNotFound
+        : code === "KB_SOURCE_REQUIRED"
+          ? this.msg.errKbSource
+          : this.msg.errGeneric;
+      this.failTurn(bot, message, code);
     } finally {
       if (run === this.run) {
         this.busy = false;
@@ -1455,15 +1552,26 @@ export class SinglebaseChat extends LitElement {
     }
   }
 
+  /**
+   * A new chat goes on top. A chat already in the list is updated where it is,
+   * keeping its dates, so opening or using a chat never reorders the list; the
+   * next load from the server brings the fresh order.
+   */
   private upsertChat(chat: ChatSummary) {
-    const rest = this.chatList.filter((c) => c._id !== chat._id);
-    const existing = this.chatList.find((c) => c._id === chat._id);
-    this.chatList = [{ ...existing, ...chat }, ...rest];
-  }
-
-  private touchChat(chatId: string) {
-    const existing = this.chatList.find((c) => c._id === chatId);
-    if (existing) this.upsertChat({ ...existing, _modified_at: new Date().toISOString() });
+    const index = this.chatList.findIndex((c) => c._id === chat._id);
+    if (index < 0) {
+      this.chatList = [chat, ...this.chatList];
+      return;
+    }
+    const existing = this.chatList[index];
+    const next = [...this.chatList];
+    next[index] = {
+      ...existing,
+      ...chat,
+      _created_at: existing._created_at ?? chat._created_at,
+      _modified_at: existing._modified_at ?? chat._modified_at
+    };
+    this.chatList = next;
   }
 
   // ── actions ───────────────────────────────────────────────
@@ -1524,6 +1632,34 @@ export class SinglebaseChat extends LitElement {
     if (next.has(key)) next.delete(key);
     else next.add(key);
     this.rawKeys = next;
+  }
+
+  /** Adds newly saved files, and says which ones the service couldn't read. */
+  private applyAttachmentResults(list: unknown) {
+    if (!Array.isArray(list)) return;
+    const saved = toSavedFiles(list).filter((f) => !this.savedFiles.some((x) => x.id === f.id));
+    if (saved.length) this.savedFiles = [...this.savedFiles, ...saved];
+    const failed = list
+      .filter((item) => item?.status === "failed")
+      .map((item) => String(item.name ?? "file"));
+    if (failed.length) this.showToast(fill(this.msg.attachmentFailed, { name: failed.join(", ") }));
+  }
+
+  /** Removes a file the service keeps on this chat. */
+  private async removeSavedFile(file: ChatSavedAttachment) {
+    const chatId = this.activeId;
+    if (!chatId) return;
+    const before = this.savedFiles;
+    this.savedFiles = before.filter((f) => f !== file);
+    try {
+      await this.resolvedClient?.llm.call("remove_chat_attachment", {
+        _id: chatId,
+        attachment_id: file.id
+      });
+    } catch {
+      if (this.activeId === chatId) this.savedFiles = before;
+      this.showToast(this.msg.errGeneric);
+    }
   }
 
   private copy(key: string, text: string) {
@@ -1690,7 +1826,12 @@ export class SinglebaseChat extends LitElement {
         );
         continue;
       }
-      accepted.push({ name: file.name, size: file.size, content: await file.text() });
+      accepted.push({
+        name: file.name,
+        size: file.size,
+        content: await file.text(),
+        ...(file.type ? { mime: file.type } : {})
+      });
     }
     if (!accepted.length) return;
     this.files = [...this.files, ...accepted];
@@ -1857,8 +1998,7 @@ export class SinglebaseChat extends LitElement {
               </button>`
             : nothing
         }
-        ${this.renderComposer()}
-        ${renderBranding(this.branding, this.brandingText, this.msg.brandingLabel, this.brandingUrl)}
+        ${this.renderComposer()} ${renderBranding(this.branding, "Chat")}
         ${
           this.toast
             ? html`<div class="toast" role="status">
@@ -2260,7 +2400,7 @@ export class SinglebaseChat extends LitElement {
 
   private renderWelcome() {
     const msg = this.msg;
-    const mode = this.mode === "rag" ? "Rag" : "Chat";
+    const mode = this.mode === "rag" ? "Rag" : this.mode === "kb" ? "Kb" : "Chat";
     const pick = (key: string) => msg[`${key}${mode}` as keyof SinglebaseChatMessages];
     const eyebrow = this.eyebrow ?? pick("eyebrow");
     const prompts = this.promptList();
@@ -2435,7 +2575,7 @@ export class SinglebaseChat extends LitElement {
   }
 
   private pillLabel(): string {
-    if (this.mode === "rag") return this.msg.searching;
+    if (this.mode === "rag" || this.mode === "kb") return this.msg.searching;
     return this.msg.thinking;
   }
 
@@ -2506,7 +2646,8 @@ export class SinglebaseChat extends LitElement {
                             >
                               <span class="n">${s.n}</span>
                               <span class="what"
-                                ><span>${s.title}</span><span>${s.collection || s.path}</span></span
+                                ><span>${s.title}${s.section ? ` · ${s.section}` : ""}</span
+                                ><span>${s.collection || s.path}</span></span
                               >
                               ${
                                 s.score !== null
@@ -2556,7 +2697,7 @@ export class SinglebaseChat extends LitElement {
                           ><span class="num">${s.n}</span
                           >${s.collection ? html`<span class="label">${s.collection}</span>` : nothing}</span
                         >
-                        <span class="t">${s.title}</span>
+                        <span class="t">${s.title}${s.section ? ` · ${s.section}` : ""}</span>
                         <span class="s">${s.text}</span>
                       </button>`
                   )}
@@ -2706,7 +2847,11 @@ export class SinglebaseChat extends LitElement {
         console.warn("[singlebase-chat] afterParse failed; showing the original.", error);
       }
     }
-    const maxCite = m.sources.length;
+    // Citations may go up to the highest source number the service gave.
+    const maxCite = m.sources.reduce(
+      (max: number, source, i) => Math.max(max, describeSource(source, i + 1).n),
+      0
+    );
     return html`<div class="answer" part="answer">
       ${blocks.map((b, i) => this.renderBlock(b, m, maxCite, i))}
     </div>`;
@@ -3093,14 +3238,13 @@ export class SinglebaseChat extends LitElement {
   private renderPanel() {
     if (!this.panel) return nothing;
     const m = this.msgs.find((x) => x.key === this.panel!.key);
-    const source = m?.sources[this.panel.n - 1];
-    if (!m || !source) return nothing;
+    if (!m) return nothing;
+    const numbered = m.sources.map((x, i) => describeSource(x, i + 1));
+    const s = numbered.find((x) => x.n === this.panel!.n);
+    if (!s) return nothing;
     const msg = this.msg;
-    const s = describeSource(source, this.panel.n);
     const cited = citedNumbers(m.content);
-    const others = m.sources
-      .map((x, i) => describeSource(x, i + 1))
-      .filter((o) => o.n !== s.n && (!cited.size || cited.has(o.n)));
+    const others = numbered.filter((o) => o.n !== s.n && (!cited.size || cited.has(o.n)));
     const refKey = `ref:${m.key}:${s.n}`;
     const reference = `"${s.text}"\n— ${s.title} [${s.n}]${s.path ? `\n${s.path}` : ""}${s.updated ? ` · Updated ${s.updated}` : ""}`;
     const meta = [
@@ -3127,6 +3271,7 @@ export class SinglebaseChat extends LitElement {
       <div class="panel-body">
         <div class="panel-meta">
           <h3>${s.title}</h3>
+          ${s.section ? html`<span class="meta">${s.section}</span>` : nothing}
           ${s.path ? html`<span class="path">${s.path}</span>` : nothing}
           ${meta ? html`<span class="meta">${meta}</span>` : nothing}
         </div>
@@ -3173,7 +3318,9 @@ export class SinglebaseChat extends LitElement {
     const placeholder =
       this.mode === "rag"
         ? msg.placeholderRag
-        : fill(msg.placeholderChat, { name: this.assistantName });
+        : this.mode === "kb"
+          ? msg.placeholderKb
+          : fill(msg.placeholderChat, { name: this.assistantName });
     const cantSend = !this.draft.trim();
     const footnote =
       this.footnote === ""
@@ -3202,6 +3349,30 @@ export class SinglebaseChat extends LitElement {
         <div class="composer-box">
           ${this.busy ? html`<div class="composer-glow"></div>` : nothing}
           <div class="composer ${this.busy ? "busy" : ""}" part="composer">
+            ${
+              this.savedFiles.length
+                ? html`<div class="pending-files" part="saved-files">
+                    ${this.savedFiles.map(
+                      (f) =>
+                        html`<div class="pending-file kept">
+                          <span class="ext">${fileExt(f.name)}</span>
+                          <span class="meta"
+                            ><span class="name">${f.name}</span
+                            ><span class="size">${msg.inThisChat}</span></span
+                          >
+                          <button
+                            type="button"
+                            aria-label=${msg.removeFromChat}
+                            title=${msg.removeFromChat}
+                            @click=${() => this.removeSavedFile(f)}
+                          >
+                            ×
+                          </button>
+                        </div>`
+                    )}
+                  </div>`
+                : nothing
+            }
             ${
               this.files.length
                 ? html`<div class="pending-files">

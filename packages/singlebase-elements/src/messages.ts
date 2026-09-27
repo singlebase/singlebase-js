@@ -160,8 +160,6 @@ export interface SinglebaseAuthMessages {
   changeEmailElsewhereHint: string;
   confirmChangeCta: string;
   codeLabel: string;
-  /** The credit under the card. A brand name — translate only the "Auth by". */
-  brandingLabel: string;
 
   // provider linking
   linkRequiresSignIn: string;
@@ -315,7 +313,6 @@ export const defaultMessages: SinglebaseAuthMessages = {
   changeEmailElsewhereHint: "Your email is changed below, with a verification step.",
   confirmChangeCta: "Confirm change",
   codeLabel: "Verification code",
-  brandingLabel: "Auth by Singlebase",
   linkRequiresSignIn: "Sign in first, then link a provider.",
 
   oauthCallbackTitle: "Finishing sign-in",

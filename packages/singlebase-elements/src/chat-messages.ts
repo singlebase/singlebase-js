@@ -12,15 +12,22 @@ export interface SinglebaseChatMessages {
   headingRag: string;
   descriptionChat: string;
   descriptionRag: string;
+  eyebrowKb: string;
+  headingKb: string;
+  descriptionKb: string;
 
   // composer
   placeholderChat: string;
   placeholderRag: string;
+  placeholderKb: string;
   footnote: string;
   attach: string;
   send: string;
   stop: string;
   removeFile: string;
+  inThisChat: string;
+  removeFromChat: string;
+  attachmentFailed: string;
   dropTitle: string;
   dropSub: string;
 
@@ -122,6 +129,7 @@ export interface SinglebaseChatMessages {
   // errors
   errGeneric: string;
   errNotFound: string;
+  errKbSource: string;
   errNoClient: string;
   errLoad: string;
   retry: string;
@@ -132,8 +140,6 @@ export interface SinglebaseChatMessages {
   openChat: string;
   closeChat: string;
   dismiss: string;
-
-  brandingLabel: string;
 }
 
 export const defaultChatMessages: SinglebaseChatMessages = {
@@ -144,14 +150,21 @@ export const defaultChatMessages: SinglebaseChatMessages = {
   descriptionChat: "Ask anything. Attach text files to give it more context.",
   descriptionRag:
     "Answers are grounded in your sources, with a citation for every claim. Attach text files to search them too.",
+  eyebrowKb: "Knowledge base",
+  headingKb: "Ask the knowledge base",
+  descriptionKb: "Answers come only from the knowledge base, with a citation for every claim.",
 
   placeholderChat: "Message {name}…",
   placeholderRag: "Ask about your sources…",
+  placeholderKb: "Ask the knowledge base…",
   footnote: "{name} can make mistakes. Check important details.",
   attach: "Attach files",
   send: "Send message",
   stop: "Stop generating",
   removeFile: "Remove file",
+  inThisChat: "In this chat",
+  removeFromChat: "Remove from this chat",
+  attachmentFailed: "Couldn't read {name}.",
   dropTitle: "Drop files to attach",
   dropSub: "Text, Markdown, CSV and JSON files are added as context.",
 
@@ -244,6 +257,7 @@ export const defaultChatMessages: SinglebaseChatMessages = {
 
   errGeneric: "Something went wrong.",
   errNotFound: "This chat no longer exists. Retry to start a new one.",
+  errKbSource: "No knowledge base is set up for this chat.",
   errNoClient: "Chat isn't connected. Create a SinglebaseClient() on this page.",
   errLoad: "Couldn't load this chat.",
   retry: "Retry",
@@ -252,9 +266,7 @@ export const defaultChatMessages: SinglebaseChatMessages = {
   bubbleText: "Hi! Questions? Ask me here.",
   openChat: "Open chat",
   closeChat: "Close chat",
-  dismiss: "Dismiss",
-
-  brandingLabel: "Chat by Singlebase"
+  dismiss: "Dismiss"
 };
 
 export function resolveChatMessages(

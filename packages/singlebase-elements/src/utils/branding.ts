@@ -1,16 +1,17 @@
 import { html, nothing } from "lit";
 
-export const DEFAULT_BRANDING_URL = "https://singlebase.cloud";
+export const BRANDING_URL = "https://singlebase.io";
+export const BRANDING_TITLE = "Singlebase.io";
 
 /**
- * The credit link. `text` falls back to the element's own label, and `url`
- * to singlebase.cloud; only http(s) URLs are used. It's a plain link: it
- * makes no request until someone clicks it.
+ * The fixed "… by Singlebase" credit. It can be hidden, never changed.
+ * It's a plain link: it makes no request until someone clicks it.
  */
-export function renderBranding(show: boolean, text: string, fallbackText: string, url: string) {
+export function renderBranding(show: boolean, product: "Auth" | "Chat" | "Files") {
   if (!show) return nothing;
-  const href = /^https?:\/\//i.test(url?.trim() ?? "") ? url.trim() : DEFAULT_BRANDING_URL;
   return html`<div class="branding" part="branding">
-    <a href=${href} target="_blank" rel="noopener noreferrer">${text?.trim() || fallbackText}</a>
+    <a href=${BRANDING_URL} title=${BRANDING_TITLE} target="_blank" rel="noopener noreferrer"
+      >${product} by Singlebase</a
+    >
   </div>`;
 }

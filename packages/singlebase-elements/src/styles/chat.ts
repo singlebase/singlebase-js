@@ -2059,6 +2059,11 @@ export const chatStyles = css`
     min-width: 0;
   }
 
+  .pending-file.kept {
+    background: var(--c-bg);
+    border-style: dashed;
+  }
+
   .pending-file .name {
     max-width: 160px;
     overflow: hidden;

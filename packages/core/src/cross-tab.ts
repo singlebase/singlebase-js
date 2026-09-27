@@ -58,6 +58,8 @@ export function crossTabChannel(name: string): CrossTabChannel {
     } catch {
       return storageEventChannel(name, id);
     }
+    // In Node an open channel keeps the process alive; tabs don't need that.
+    (channel as { unref?: () => void }).unref?.();
     return {
       post(signal) {
         try {

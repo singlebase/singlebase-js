@@ -14,10 +14,11 @@ describe("branding credit", () => {
     expect(textOf(el)).to.include("Auth by Singlebase");
   });
 
-  it("links to singlebase.cloud, safely", async () => {
+  it("links to singlebase.io, safely", async () => {
     const { el } = await mountWidget();
     const a = badge(el)!;
-    expect(a.getAttribute("href")).to.equal("https://singlebase.cloud");
+    expect(a.getAttribute("href")).to.equal("https://singlebase.io");
+    expect(a.getAttribute("title")).to.equal("Singlebase.io");
     expect(a.getAttribute("rel")).to.equal("noopener noreferrer");
     expect(a.getAttribute("target")).to.equal("_blank");
   });
@@ -84,11 +85,11 @@ describe("branding credit", () => {
     expect(panel.lastElementChild!.getAttribute("part")).to.equal("branding");
   });
 
-  it("can be relabelled through messages, for translation", async () => {
+  it("can't be relabelled through messages", async () => {
     const { el } = await mountWidget();
-    el.messages = { brandingLabel: "Authentification par Singlebase" };
+    el.messages = { brandingLabel: "Powered by Acme" } as any;
     await el.updateComplete;
-    expect(badge(el)!.textContent!.trim()).to.equal("Authentification par Singlebase");
+    expect(badge(el)!.textContent!.trim()).to.equal("Auth by Singlebase");
   });
 });
 
@@ -117,20 +118,19 @@ describe("branding across elements", () => {
     expect(new Set(looks).size).to.equal(1);
   });
 
-  it("takes a custom text and link on every element", async () => {
-    const els = await mountAll(
-      JSON.stringify({ brandingText: "Powered by Acme", brandingUrl: "https://acme.test/" })
-    );
-    for (const el of els) {
-      const a = badge(el)!;
-      expect(a.textContent!.trim()).to.equal("Powered by Acme");
-      expect(a.getAttribute("href")).to.equal("https://acme.test/");
-    }
+  it("is fixed: each element names itself and links to singlebase.io", async () => {
+    const els = await mountAll();
+    const texts = els.map((el) => badge(el)!.textContent!.trim());
+    expect(texts).to.deep.equal([
+      "Auth by Singlebase",
+      "Files by Singlebase",
+      "Chat by Singlebase"
+    ]);
+    for (const el of els) expect(badge(el)!.getAttribute("href")).to.equal("https://singlebase.io");
   });
 
-  it("refuses a non-http link", async () => {
-    const els = await mountAll(JSON.stringify({ brandingUrl: "javascript:alert(1)" }));
-    for (const el of els)
-      expect(badge(el)!.getAttribute("href")).to.equal("https://singlebase.cloud");
+  it("hides with branding=false on every element", async () => {
+    const els = await mountAll(JSON.stringify({ branding: false }));
+    for (const el of els) expect(badge(el)).to.not.exist;
   });
 });

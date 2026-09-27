@@ -98,8 +98,6 @@ export interface UploaderConfig {
   allowRename: boolean;
   autoUpload: boolean;
   branding: boolean;
-  brandingText: string;
-  brandingUrl: string;
   logoUrl: string;
   logoText: string;
   heading: string;
@@ -128,8 +126,6 @@ const CONFIG_KEYS: readonly (keyof UploaderConfig)[] = [
   "allowRename",
   "autoUpload",
   "branding",
-  "brandingText",
-  "brandingUrl",
   "logoUrl",
   "logoText",
   "heading",
@@ -470,12 +466,6 @@ export class SinglebaseUploader extends LitElement {
   /** The "Files by Singlebase" credit. A plain link — it makes no request. */
   @property({ converter: flagAttr })
   accessor branding = true;
-
-  /** The credit's text. Empty uses the element's default ("… by Singlebase"). */
-  @property({ attribute: "branding-text" }) accessor brandingText = "";
-
-  /** Where the credit links to. Only http(s); anything else uses singlebase.cloud. */
-  @property({ attribute: "branding-url" }) accessor brandingUrl = "";
 
   @property({ attribute: "logo-url" }) accessor logoUrl = "";
   @property({ attribute: "logo-text" }) accessor logoText = "";
@@ -918,12 +908,7 @@ export class SinglebaseUploader extends LitElement {
   }
 
   private renderBranding() {
-    return renderBranding(
-      this.branding,
-      this.brandingText,
-      this.msg.brandingLabel,
-      this.brandingUrl
-    );
+    return renderBranding(this.branding, "Files");
   }
 
   private renderNotice() {

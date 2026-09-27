@@ -25,7 +25,7 @@ SinglebaseClient({ apiKey: "wk_YOUR_WEB_KEY" });
 The uploader uses the page's `SinglebaseClient()`, and the signed-in user's
 token goes with every request. To target another client, set `el.client`.
 
-With no build step, the [script-tag bundle](./SBC-AUTHUI.md#load) includes it.
+With no build step, the [script-tag bundle](./singlebase-authui.md#load) includes it.
 
 ---
 
@@ -189,9 +189,7 @@ forms. `redirect-url` navigates once every file succeeds (same-origin only).
 | `redirect-url` | — | Where to go when all files succeed |
 | `heading` / `description` | — | Card copy |
 | `logo-url` / `logo-text` | — | Your mark |
-| `branding` | on | The "Files by Singlebase" credit. It makes no request |
-| `branding-text` / `branding-url` | — | The credit's text and link (http(s) only). Same on every Singlebase element |
-| `theme` / `density` / `radius` | — | As in [AuthUI theming](./SBC-AUTHUI.md#theming) |
+| `theme` / `density` / `radius` | — | As in [AuthUI theming](./singlebase-authui.md#theming) |
 
 ### Properties and methods
 
@@ -210,10 +208,10 @@ forms. `redirect-url` navigates once every file succeeds (same-origin only).
 
 It uses the same `--sb-*` tokens as AuthUI. The parts are `card`, `dropzone`,
 `files`, `file`, `file-type`, `preview`, `progress`, `count`, `submit`,
-`error`, `logo` and `branding`.
+`error` and `logo`.
 
 ### Without the element
 
 The same flow is available from the SDK: `sbc.files.upload(files, { onProgress })`,
 or step by step with `initiateUpload`, `uploadToRemote`, `completeUpload` and
-`failUpload`. See the [README](./README.md#sbcfiles--files).
+`failUpload`. See [Files in the SDK guide](./sdk.md#sbcfiles--files).

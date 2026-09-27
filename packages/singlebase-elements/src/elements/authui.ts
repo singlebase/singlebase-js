@@ -230,12 +230,6 @@ export class SinglebaseAuthScreen extends SinglebaseElementBase {
    */
   @property({ converter: flagAttr, attribute: "branding" }) accessor branding = true;
 
-  /** The credit's text. Empty uses the element's default ("… by Singlebase"). */
-  @property({ attribute: "branding-text" }) accessor brandingText = "";
-
-  /** Where the credit links to. Only http(s); anything else uses singlebase.cloud. */
-  @property({ attribute: "branding-url" }) accessor brandingUrl = "";
-
   /**
    * Where to send the user once a session exists. Same-origin only — an
    * absolute URL pointing anywhere else is refused, because a login widget
@@ -541,12 +535,7 @@ export class SinglebaseAuthScreen extends SinglebaseElementBase {
   }
 
   private renderBranding() {
-    return renderBranding(
-      this.branding,
-      this.brandingText,
-      this.msg.brandingLabel,
-      this.brandingUrl
-    );
+    return renderBranding(this.branding, "Auth");
   }
 
   /** Every screen renders inside this, so the credit appears once and only once. */
