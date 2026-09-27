@@ -1,18 +1,25 @@
 # singlebase-js
 
+This is the offical TS/JS toolking [Singlebase](https://singlebase.io). 
+
+
 **Add sign-in, file uploads and AI chat to any web app, with a single tag each.**
 
 singlebase-js is the official JavaScript toolkit for
 [Singlebase](https://singlebase.io). It has two parts, and this documentation
 covers both:
 
-- **Web Components**: ready-made UI for authentication, uploads and AI chat.
-  They talk to Singlebase on their own, so the common flows need no backend
-  code.
 - **SDK**: one client for every Singlebase service (auth, data, files, the
   signed-in user and LLM), for when you build your own UI or logic.
 
-They work in plain HTML, React, Vue, Svelte, or anything that renders a tag.
+- **Web Components**: ready-made UI for authentication, uploads and AI chat.
+  They talk to Singlebase on their own, so the common flows need no backend
+  code.
+
+**NB**: Web components work in plain HTML, React, Vue, Svelte, or anything that renders a tag. So you can integrate easily.
+
+
+### Widget / Web Components demo
 
 | `<singlebase-authui>` | `<singlebase-uploader>` |
 | --- | --- |
@@ -23,23 +30,6 @@ They work in plain HTML, React, Vue, Svelte, or anything that renders a tag.
 | <img src="./docs/images/chat.png" alt="singlebase-chat with the chat list, a cited answer and follow-up questions" width="780"> |
 
 ---
-
-## Web Components
-
-| Element | What it gives you |
-| --- | --- |
-| [`<singlebase-authui>`](./docs/singlebase-authui.md) | Sign-in, sign-up, one-time codes, password reset, OAuth, invites and the account screen, plus guards and profile display |
-| [`<singlebase-uploader>`](./docs/singlebase-uploader.md) | File picking, in-browser checks, previews and direct-to-storage uploads |
-| [`<singlebase-chat>`](./docs/singlebase-chat.md) | An AI chat workspace: history, cited sources, rich answers, bookmarks and export, as a page, a panel or a launcher |
-
-- **No framework, no build step.** Standard custom elements with Shadow DOM,
-  loaded from one script.
-- **One session per page.** The elements share one client, so signing in once
-  is enough for the uploader and the chat.
-- **Styled with CSS.** The same `--sb-*` custom properties and `::part()`
-  hooks theme all of them.
-- **Safe by default.** Only the public `wk_` web key goes in the page, and
-  tokens never appear in URLs, logs or the DOM.
 
 ## Quick start
 
@@ -84,15 +74,33 @@ const answer = await sbc.llm.ask({ message: "Summarize my notes" });
 The signed-in user's token is attached to every call, and refreshed when it
 goes stale.
 
+---
+
+## Web Components
+
+| Element | What it gives you |
+| --- | --- |
+| [`<singlebase-authui>`](./docs/singlebase-authui.md) | Sign-in, sign-up, one-time codes, password reset, OAuth, invites and the account screen, plus guards and profile display |
+| [`<singlebase-uploader>`](./docs/singlebase-uploader.md) | File picking, in-browser checks, previews and direct-to-storage uploads |
+| [`<singlebase-chat>`](./docs/singlebase-chat.md) | An AI chat workspace: history, cited sources, rich answers, bookmarks and export, as a page, a panel or a launcher |
+
+- **No framework, no build step.** Standard custom elements with Shadow DOM,
+  loaded from one script.
+- **One session per page.** The elements share one client, so signing in once
+  is enough for the uploader and the chat.
+- **Styled with CSS.** The same `--sb-*` custom properties and `::part()`
+  hooks theme all of them.
+- **Safe by default.** Only the public `wk_` web key goes in the page, and
+  tokens never appear in URLs, logs or the DOM.
+
 ## Documentation
 
 | Guide | Covers |
 | --- | --- |
+| [SDK](./docs/sdk.md) | `SinglebaseClient()`: connecting, calling services, auth, data, files and LLM |
 | [AuthUI](./docs/singlebase-authui.md) | `<singlebase-authui>` and its guard, buttons and display elements; theming, events and methods |
 | [Uploader](./docs/singlebase-uploader.md) | `<singlebase-uploader>`: views, limits, per-format rules, events |
 | [Chat](./docs/singlebase-chat.md) | `<singlebase-chat>`: embeds, modes, rendering, extending, events |
-| [SDK](./docs/sdk.md) | `SinglebaseClient()`: connecting, calling services, auth, data, files and LLM |
-| [Advanced](./docs/advanced.md) | Settings most apps never need, such as the Singlebase credit |
 | [Development](./docs/development.md) | Building, testing, the examples and releasing this repository |
 
 ## Packages
