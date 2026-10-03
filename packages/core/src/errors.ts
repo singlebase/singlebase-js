@@ -58,10 +58,14 @@ export type ErrorHint =
   | "hide_email_forms"
   | "hide_signup"
   | "hide_oauth"
+  | "remove_oauth_from_signin"
   | "remove_oauth_from_signup"
   | "refresh_settings_hide_provider"
   | "restart_oauth_new_nonce"
+  | "restart_oauth"
+  | "explain_verified_email_required"
   | "ask_signin_then_link"
+  | "provider_already_linked"
   | "route_to_signin"
   | "show_integrator_config_error"
   | "unknown";
@@ -83,10 +87,15 @@ const ERROR_HINTS: Record<string, ErrorHint> = {
   EMAIL_PROVIDER_DISABLED: "hide_email_forms",
   EMAIL_SIGNUP_DISABLED: "hide_signup",
   OAUTH_DISABLED: "hide_oauth",
+  OAUTH_SIGNIN_DISABLED: "remove_oauth_from_signin",
   OAUTH_SIGNUP_DISABLED: "remove_oauth_from_signup",
   INVALID_OAUTH_PROVIDER: "refresh_settings_hide_provider",
+  MISSING_OAUTH_CREDENTIALS: "show_integrator_config_error",
+  OAUTH_VERIFICATION_FAILED: "restart_oauth",
+  VERIFIED_PROVIDER_EMAIL_REQUIRED: "explain_verified_email_required",
   INVALID_NONCE: "restart_oauth_new_nonce",
   SIGN_IN_TO_LINK_PROVIDER: "ask_signin_then_link",
+  PROVIDER_ALREADY_LINKED: "provider_already_linked",
   AUTHENTICATION_REQUIRED: "route_to_signin",
   UNAUTHORIZED_DOMAIN: "show_integrator_config_error"
 };

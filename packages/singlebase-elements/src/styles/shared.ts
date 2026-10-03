@@ -93,6 +93,32 @@ export const sharedStyles = css`
     text-wrap: pretty;
   }
 
+  .pw-rules {
+    margin-top: 6px;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--sb-muted-ink, #61666c);
+  }
+
+  .pw-rules summary {
+    cursor: pointer;
+    width: fit-content;
+  }
+
+  .pw-rules summary:hover {
+    color: var(--sb-ink, #16181a);
+  }
+
+  .pw-rules ul {
+    margin: 4px 0 0;
+    padding-left: 18px;
+  }
+
+  .consent {
+    text-align: center;
+    text-wrap: balance;
+  }
+
   .sub-label {
     font-family: var(--sb-mono, "Geist Mono", ui-monospace, monospace);
     font-size: 11px;

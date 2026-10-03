@@ -674,7 +674,7 @@
 
       /** The attributes that differ from the element's own defaults. */
       function markup() {
-        const ELEMENT_DEFAULTS = { ...DEFAULTS, attachmentsMode: "retrieval", format: "advanced", allowRaw: false, footnote: undefined, greetingBubble: false, unreadBadge: false, assistantName: "Assistant", bubbleText: "" };
+        const ELEMENT_DEFAULTS = { ...DEFAULTS, format: "advanced", allowRaw: false, footnote: undefined, greetingBubble: false, unreadBadge: false, assistantName: "Assistant", bubbleText: "" };
         const attrs = [];
         for (const [key, value] of Object.entries(state)) {
           if (key === "accent" || value === ELEMENT_DEFAULTS[key]) continue;

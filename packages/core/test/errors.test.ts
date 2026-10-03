@@ -40,6 +40,16 @@ describe("mapErrorToHint", () => {
     expect(mapErrorToHint("AUTH_RATE_LIMITED")).toBe("disable_retry_show_rate_limited");
   });
 
+  it("maps the OAuth codes", () => {
+    expect(mapErrorToHint("OAUTH_SIGNIN_DISABLED")).toBe("remove_oauth_from_signin");
+    expect(mapErrorToHint("MISSING_OAUTH_CREDENTIALS")).toBe("show_integrator_config_error");
+    expect(mapErrorToHint("OAUTH_VERIFICATION_FAILED")).toBe("restart_oauth");
+    expect(mapErrorToHint("PROVIDER_ALREADY_LINKED")).toBe("provider_already_linked");
+    expect(mapErrorToHint("VERIFIED_PROVIDER_EMAIL_REQUIRED")).toBe(
+      "explain_verified_email_required"
+    );
+  });
+
   it("falls back to 'unknown' for an unrecognized code", () => {
     expect(mapErrorToHint("SOMETHING_NEW")).toBe("unknown");
   });

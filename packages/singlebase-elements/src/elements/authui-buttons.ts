@@ -1,8 +1,14 @@
 import { html, nothing, type PropertyValues } from "lit";
 import { customElement, property } from "lit/decorators.js";
-import type { AuthSettings, OAuthIntent } from "@singlebase/singlebase-sdk";
+import type { AuthSettings, OAuthIntent, OAuthProviderName } from "@singlebase/singlebase-sdk";
 import { SinglebaseFormBase } from "./authui-form-base.js";
 import { SettingsController } from "../controllers/settings-controller.js";
+import {
+  linkStorageKey,
+  oauthProviders,
+  startIntent,
+  type OAuthProviderOption
+} from "../utils/oauth.js";
 
 export type ButtonsType = "signout" | "oauth" | "link";
 
@@ -28,7 +34,7 @@ export class SinglebaseAuthButtons extends SinglebaseFormBase {
   /** link: the provider to connect to the signed-in account. */
   @property() accessor provider = "";
 
-  /** link: display name, when it differs from the provider id. */
+  /** link: label override. By default it's the project's `provider_name`. */
   @property({ attribute: "provider-name" }) accessor providerName = "";
 
   /** Inside a card that already supplies chrome, drop this element's own. */
@@ -43,7 +49,7 @@ export class SinglebaseAuthButtons extends SinglebaseFormBase {
 
   override willUpdate(changed: PropertyValues): void {
     super.willUpdate(changed);
-    if (this.type === "oauth") this.settingsCtl.load(this.resolvedClient, this.settings);
+    if (this.type !== "signout") this.settingsCtl.load(this.resolvedClient, this.settings);
   }
 
   private get effectiveSettings(): AuthSettings | null {
@@ -51,30 +57,12 @@ export class SinglebaseAuthButtons extends SinglebaseFormBase {
   }
 
   // ── oauth ────────────────────────────────────────────────
-  private get providers(): Array<{ id: string; name: string; mark: string }> {
-    const s = this.effectiveSettings;
-    if (!s || !s.oauth_settings.enabled) return [];
-    const allowed =
-      this.intent === "signup" ? s.oauth_settings.allow_signup : s.oauth_settings.allow_signin;
-    if (!allowed && this.intent !== "link") return [];
-
-    const marks: Record<string, string> = {
-      google: "G",
-      github: "GH",
-      linkedin: "in",
-      facebook: "f"
-    };
-    return Object.entries(s.oauth_providers)
-      .filter(([, p]) => p.enabled)
-      .map(([id, p]) => ({
-        id,
-        name: p.provider_name,
-        mark: marks[id] ?? p.provider_name.slice(0, 2)
-      }));
+  private get providers(): OAuthProviderOption[] {
+    return oauthProviders(this.effectiveSettings, this.intent);
   }
 
   /** Shared by the oauth and link flows: nonce, start, redirect. */
-  private async startOAuth(providerId: string, intent: OAuthIntent, linking = false) {
+  private async startOAuth(providerId: OAuthProviderName, intent: OAuthIntent, linking = false) {
     const client = this.resolvedClient;
     if (!client) return;
 
@@ -94,11 +82,14 @@ export class SinglebaseAuthButtons extends SinglebaseFormBase {
     await this.run(async () => {
       const nonce = await client.createOAuthNonce(this.signal);
       globalThis.sessionStorage?.setItem(this.nonceStorageKey, nonce);
+      const linkKey = linkStorageKey(this.nonceStorageKey);
+      if (linking) globalThis.sessionStorage?.setItem(linkKey, providerId);
+      else globalThis.sessionStorage?.removeItem(linkKey);
       const { oauth_redirect_url } = await client.startOAuth(
         {
           provider: providerId,
           nonce,
-          intent,
+          intent: startIntent(this.effectiveSettings, intent),
           ...(linking ? { id_token: idToken, refresh_token: refreshToken } : {})
         },
         this.signal
@@ -160,6 +151,12 @@ export class SinglebaseAuthButtons extends SinglebaseFormBase {
 
   // ── link ─────────────────────────────────────────────────
   private renderLink() {
+    // Once settings are known, only link a provider the project has enabled.
+    const settings = this.effectiveSettings;
+    const option = oauthProviders(settings, "link").find((p) => p.id === this.provider);
+    if (settings && !option) return nothing;
+    const name = this.providerName || option?.name || this.provider;
+
     return html`
       <div class="stack">
         ${this.renderStatus()}
@@ -168,10 +165,10 @@ export class SinglebaseAuthButtons extends SinglebaseFormBase {
           class="secondary"
           part="oauth-button"
           ?disabled=${this.submitting}
-          @click=${() => this.startOAuth(this.provider, "link", true)}
+          @click=${() => this.startOAuth(this.provider as OAuthProviderName, "link", true)}
         >
           ${this.submitting ? html`<span class="spinner"></span>` : nothing}
-          <span>${this.msg.oauthContinueWith} ${this.providerName || this.provider}</span>
+          <span>${this.msg.oauthContinueWith} ${name}</span>
         </button>
       </div>
     `;

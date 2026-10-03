@@ -25,6 +25,7 @@ import type {
   ChangeUsernameInput,
   CompleteOAuthInput,
   OAuthConnectResult,
+  StartOAuthResult,
   RequestCodeInput,
   RequestCodeResult,
   ResetPasswordInput,
@@ -76,7 +77,7 @@ export interface AuthClient {
   startOAuth(
     input: Omit<StartOAuthInput, "nonce"> & { nonce?: string },
     signal?: AbortSignal
-  ): Promise<OAuthConnectResult>;
+  ): Promise<StartOAuthResult>;
   completeOAuth(input: CompleteOAuthInput, signal?: AbortSignal): Promise<AuthSession>;
 
   // ── state accessors ──────────────────────────────────────
@@ -427,11 +428,13 @@ export function createAuthClient(
     startOAuth: (input, signal) =>
       track(OP.oauthConnect, async () => {
         const nonce = input.nonce ?? (await client.createOAuthNonce(signal));
-        return call<OAuthConnectResult, unknown>(
+        const result = await call<OAuthConnectResult, unknown>(
           OP.oauthConnect,
           { ...input, nonce, intent: input.intent ?? "signin", aud: input.aud ?? audience },
           { bearer: null, signal }
         );
+        // The caller needs the nonce for completeOAuth(), even one made here.
+        return { ...result, nonce };
       }),
 
     completeOAuth: (input, signal) =>

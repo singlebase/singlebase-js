@@ -109,7 +109,12 @@ describe("singlebase-authui-buttons", () => {
         .settings=${
           {
             enabled: true,
-            oauth_settings: { enabled: true, allow_signin: true, allow_signup: true },
+            oauth_settings: {
+              enabled: true,
+              allow_signin: true,
+              allow_signup: true,
+              redirect_url: "https://app.example.com/auth/callback"
+            },
             oauth_providers: {
               google: { enabled: true, type: "client", name: "google", provider_name: "Google" },
               github: { enabled: true, type: "client", name: "github", provider_name: "GitHub" }
@@ -131,7 +136,12 @@ describe("singlebase-authui-buttons", () => {
         .settings=${
           {
             enabled: true,
-            oauth_settings: { enabled: false, allow_signin: false, allow_signup: false },
+            oauth_settings: {
+              enabled: false,
+              allow_signin: false,
+              allow_signup: false,
+              redirect_url: null
+            },
             oauth_providers: {}
           } as never
         }

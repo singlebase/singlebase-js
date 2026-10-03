@@ -159,22 +159,19 @@ error card with **Retry**. 👍 / 👎 fire an event; they aren't stored.
 
 The paperclip, or a drop anywhere on the conversation, attaches up to 5 text
 files (`.md`, `.txt`, `.csv`, `.tsv`, `.json`, `.html`, `.yaml`, `.xml`, `.log`;
-512 KB each). They're read in the browser and sent as `retrieval` with that one
-message: CSV as `csv`, JSON as `json`, the rest as `docs`. Their names are
-stored in the message's `metadata.attachments`. `allow-upload="false"` hides
-the control.
+512 KB each). They're read in the browser and their names are stored in the
+message's `metadata.attachments`. `allow-upload="false"` hides the control.
 
-Retrieval lasts one turn, so a later message doesn't include the file; the
-model only has what it said about it in its reply.
+By default the files are sent once as `attachments` (`{ type: "content",
+content, name, mime, size, save_attachment }`), and the service keeps them on
+the chat and uses them on later turns. They show above the composer marked
+**In this chat**, come back when the chat is reopened, and × removes one
+(`llm.remove_chat_attachment`). A file the service couldn't read is named in a
+notice. `save-attachments="false"` sends them for that message only.
 
-**Keep files on the chat** with `attachments-mode="payload"`. Files are then
-sent once as `attachments` (`{ type: "content", content, name, mime, size,
-save_attachment }`), and the service keeps them on the chat and uses them on
-later turns. They show above the composer marked **In this chat**, come back
-when the chat is reopened, and × removes one (`llm.remove_chat_attachment`).
-A file the service couldn't read is named in a notice.
-`save-attachments="false"` sends them for that message only. This needs a
-service that supports attachments; the default `retrieval` works everywhere.
+**One message only** with `attachments-mode="retrieval"`: files go as that
+message's `retrieval` (CSV as `csv`, JSON as `json`, the rest as `docs`), and a
+later message doesn't include them.
 
 ---
 
@@ -473,8 +470,8 @@ Events bubble out of the shadow DOM.
 | `system-message` | — | Extra instructions, sent when a chat is created |
 | `metadata` | — | Stored on each user message, never sent to the model (JSON) |
 | `followups` | on | Ask the model for follow-up questions |
-| `attachments-mode` | `retrieval` | `retrieval` (files go with one message) or `payload` (the service keeps them on the chat) |
-| `save-attachments` | on | With `attachments-mode="payload"`: keep files on the chat |
+| `attachments-mode` | `payload` | `payload` (the service keeps files on the chat) or `retrieval` (files go with one message) |
+| `save-attachments` | on | Keep attached files on the chat (`attachments-mode="payload"`) |
 | `show-followups` | on | Show them under the latest reply |
 | `show-sources` | on | The "Cited sources" cards and "Searched n sources" row under answers (the `[n]` chips stay) |
 | `show-new-chat` | on | The New chat button |
@@ -517,7 +514,7 @@ Events bubble out of the shadow DOM.
 | `beforeSend` | `(payload, { chatId, isNew, message }) => payload \| false`, before each message is sent |
 | `afterParse` | `(blocks, { message, format }) => blocks`, before a reply is drawn |
 | `chatId` / `thread` / `chats` | The open chat's id, its messages, and the loaded list |
-| `attachments` | Files the service keeps on the open chat (`attachments-mode="payload"`) |
+| `attachments` | Files the service keeps on the open chat |
 | `send(text)` | Send a message (no argument sends the composer's text) |
 | `newChat()` / `openChat(id)` | Start a chat / open a saved one |
 | `stop()` | Stop the current reply |
@@ -544,12 +541,14 @@ for the operations.
 
 ## Service support
 
-Sources come back numbered and normalized (`n`, `section`, `score`…), and the
-chat uses them as they are.
+The chat relies on these `llm` service features:
 
-A few options depend on service updates that are rolling out
-([details](./chat-backend-notes.md)):
-
-- `docsets` and `attachments-mode="payload"` need the updated service.
-- Until the service applies `mode` itself, `mode="kb"` is enforced by the
-  chat's own instructions.
+- **Sources** come back numbered and normalized (`n`, `section`, `score`…), and
+  the chat uses them as they are.
+- **`mode`** is applied by the service: `kb` with no knowledge source is
+  refused with `KB_SOURCE_REQUIRED`.
+- **Docsets** are resolved by the API from the console-managed definitions.
+- **Attachments** are kept on the chat, listed in `llm.get_chat`, and removed
+  with `llm.remove_chat_attachment`.
+- **Retrieval** entries use `source`; web keys may only use `docset`, `docs`,
+  `json`, `csv`, `data` and `attachments`.

@@ -502,16 +502,16 @@ function toRetrieval(files: ChatAttachment[]): Record<string, unknown>[] {
   const out: Record<string, unknown>[] = [];
   const documents: { title: string; content: string }[] = [];
   for (const file of files) {
-    if (/\.csv$/i.test(file.name)) out.push({ type: "csv", data: file.content });
+    if (/\.csv$/i.test(file.name)) out.push({ source: "csv", data: file.content });
     else if (/\.json$/i.test(file.name)) {
       try {
-        out.push({ type: "json", data: JSON.parse(file.content) });
+        out.push({ source: "json", data: JSON.parse(file.content) });
       } catch {
         documents.push({ title: file.name, content: file.content });
       }
     } else documents.push({ title: file.name, content: file.content });
   }
-  if (documents.length) out.push({ type: "docs", payload: { documents } });
+  if (documents.length) out.push({ source: "docs", payload: { documents } });
   return out;
 }
 
@@ -598,12 +598,12 @@ export class SinglebaseChat extends LitElement {
   @property() accessor docsets: string | string[] = "";
 
   /**
-   * How attached files reach the service: `retrieval` (this message only;
-   * works with every service version) or `payload` (as `attachments`, which
-   * the service keeps on the chat for later turns).
+   * How attached files reach the service: `payload` (as `attachments`, which
+   * the service keeps on the chat for later turns) or `retrieval` (with this
+   * message only).
    */
   @property({ attribute: "attachments-mode" }) accessor attachmentsMode: "retrieval" | "payload" =
-    "retrieval";
+    "payload";
 
   /** With attachments-mode="payload": keep attached files on the chat. */
   @property({ converter: flagAttr, attribute: "save-attachments" }) accessor saveAttachments = true;

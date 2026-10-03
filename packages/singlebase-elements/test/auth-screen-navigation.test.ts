@@ -15,6 +15,7 @@ const SETTINGS = {
     second_factor: null,
     signup_verify_email: false,
     account_update_verification: null,
+    password_recovery_verification: "email_otp",
     password_policy: {
       NAME: "MEDIUM",
       LENGTH: [8, 64] as [number, number],
@@ -24,7 +25,12 @@ const SETTINGS = {
       UPPERCASE: false
     }
   },
-  oauth_settings: { enabled: true, allow_signin: true, allow_signup: true },
+  oauth_settings: {
+    enabled: true,
+    allow_signin: true,
+    allow_signup: true,
+    redirect_url: "https://app.example.com/auth/callback"
+  },
   oauth_providers: {
     google: { enabled: true, type: "client", name: "google", provider_name: "Google" },
     github: { enabled: true, type: "client", name: "github", provider_name: "GitHub" }

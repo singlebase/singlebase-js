@@ -82,6 +82,9 @@ export interface PasswordPolicy {
   UPPERCASE: boolean;
 }
 
+/** The built-in OAuth providers. */
+export type OAuthProviderName = "google" | "github" | "facebook" | "linkedin";
+
 export interface OAuthProviderSettings {
   enabled: boolean;
   type: string;
@@ -100,12 +103,16 @@ export interface AuthSettings {
     second_factor: string | null;
     signup_verify_email: boolean;
     account_update_verification: string | null;
+    /** `"email_otp"` when email password recovery is offered. */
+    password_recovery_verification: string | null;
     password_policy: PasswordPolicy;
   };
   oauth_settings: {
     enabled: boolean;
     allow_signin: boolean;
     allow_signup: boolean;
+    /** The frontend route the backend sends the browser back to. OAuth is off without it. */
+    redirect_url: string | null;
   };
   oauth_providers: Record<string, OAuthProviderSettings>;
 }
@@ -118,7 +125,7 @@ export interface SignUpInput {
   email: string;
   password: string;
   first_name: string;
-  last_name: string;
+  last_name?: string;
   phone?: string;
   profile_photo?: string;
   metadata?: Record<string, unknown>;
@@ -252,7 +259,7 @@ export interface ChangeUsernameInput {
 export type OAuthIntent = "signin" | "signup" | "link";
 
 export interface StartOAuthInput {
-  provider: string;
+  provider: OAuthProviderName;
   nonce: string;
   intent?: OAuthIntent;
   aud?: Audience;
@@ -265,6 +272,12 @@ export interface StartOAuthInput {
 export interface OAuthConnectResult {
   oauth_redirect_url: string;
   oauth_provider: string;
+}
+
+/** What `startOAuth()` returns: the server's result plus the nonce it used. */
+export interface StartOAuthResult extends OAuthConnectResult {
+  /** Keep it (e.g. in sessionStorage): `completeOAuth()` needs the same nonce. */
+  nonce: string;
 }
 
 export interface CompleteOAuthInput {

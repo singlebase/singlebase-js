@@ -1,9 +1,16 @@
 import { html, nothing, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import { createFilesUploadApi, type AuthSettings } from "@singlebase/singlebase-sdk";
+import {
+  createFilesUploadApi,
+  type AuthSettings,
+  type OAuthProviderName,
+  type UpdateAccountInput
+} from "@singlebase/singlebase-sdk";
 import { SinglebaseFormBase } from "./authui-form-base.js";
 import { SettingsController } from "../controllers/settings-controller.js";
 import { fullNameOf, initialsOf } from "../utils/profile.js";
+import { linkStorageKey, oauthProviders, type OAuthProviderOption } from "../utils/oauth.js";
+import { newPasswordPlaceholder, passwordError, renderPasswordRules } from "../utils/password.js";
 import "./uploader.js";
 import type { SinglebaseUploader } from "./uploader.js";
 
@@ -64,7 +71,6 @@ export class SinglebaseAccountScreen extends SinglebaseFormBase {
   @state() private accessor emailError = "";
   @state() private accessor emailSaved = "";
 
-  @state() private accessor curPass = "";
   @state() private accessor newPass = "";
   @state() private accessor confirmPass = "";
 
@@ -189,26 +195,38 @@ export class SinglebaseAccountScreen extends SinglebaseFormBase {
   private async onSaveProfile() {
     const client = this.resolvedClient;
     if (!client) return;
-    if (!this.dFirst.trim() || !this.dLast.trim()) {
-      this.profileError = "First and last name cannot be empty.";
+    const first = this.dFirst.trim();
+    const last = this.dLast.trim();
+    const phone = this.dPhone.trim();
+    if (!first) {
+      this.profileError = this.msg.firstNameRequiredError;
       return;
     }
-    if (this.dPhone.replace(/\D/g, "").length < 7) {
+    // Phone is optional; check it only when one is given.
+    if (phone && phone.replace(/\D/g, "").length < 7) {
       this.profileError = this.msg.invalidPhoneError;
       return;
     }
+
+    // Send only what changed: user.update needs at least one changed field.
+    const u = this.user;
+    const changes: UpdateAccountInput = {};
+    if (first !== (u?.first_name ?? "")) changes.first_name = first;
+    if (last !== (u?.last_name ?? "")) changes.last_name = last;
+    if (phone !== (u?.phone ?? "")) changes.phone = phone;
+    if (Object.keys(changes).length === 0) {
+      this.editMode = "";
+      return;
+    }
+
     await this.run(async () => {
-      await client.updateAccount(
-        { first_name: this.dFirst, last_name: this.dLast, phone: this.dPhone },
-        this.signal
-      );
+      await client.updateAccount(changes, this.signal);
       this.editMode = "";
       this.flash("profileSaved", this.msg.savedNote);
     });
   }
 
   private startPassEdit() {
-    this.curPass = "";
     this.newPass = "";
     this.confirmPass = "";
     this.newPassError = "";
@@ -221,12 +239,12 @@ export class SinglebaseAccountScreen extends SinglebaseFormBase {
   private async onChangePass() {
     const client = this.resolvedClient;
     if (!client) return;
-    if (!this.curPass) {
-      this.newPassError = "Enter your current password.";
-      return;
-    }
-    if (this.newPass.length < 10) {
-      this.newPassError = this.msg.passwordMinError;
+    // The signed-in session authorizes the change (auth.change_password takes
+    // only the new password), so accounts created with OAuth can set one too.
+    const settings = this.settings ?? this.settingsCtl.settings;
+    const problem = passwordError(this.newPass, settings?.auth_settings.password_policy, this.msg);
+    if (problem) {
+      this.newPassError = problem;
       return;
     }
     if (this.newPass !== this.confirmPass) {
@@ -236,7 +254,6 @@ export class SinglebaseAccountScreen extends SinglebaseFormBase {
     await this.run(async () => {
       await client.changePassword({ password: this.newPass }, this.signal);
       this.editMode = "";
-      this.curPass = "";
       this.newPass = "";
       this.confirmPass = "";
       this.flash("passSaved", this.msg.passwordUpdatedNote);
@@ -432,13 +449,14 @@ export class SinglebaseAccountScreen extends SinglebaseFormBase {
     });
   }
 
-  private async onConnectProvider(providerId: string) {
+  private async onConnectProvider(providerId: OAuthProviderName) {
     const client = this.resolvedClient;
     const state = this.auth.state;
     if (!client || state.status !== "authenticated") return;
     await this.run(async () => {
       const nonce = await client.createOAuthNonce(this.signal);
       globalThis.sessionStorage?.setItem(this.nonceStorageKey, nonce);
+      globalThis.sessionStorage?.setItem(linkStorageKey(this.nonceStorageKey), providerId);
       const { oauth_redirect_url } = await client.startOAuth(
         {
           provider: providerId,
@@ -453,22 +471,8 @@ export class SinglebaseAccountScreen extends SinglebaseFormBase {
     });
   }
 
-  private get availableProviders(): Array<{ id: string; name: string; mark: string }> {
-    const s = this.settings ?? this.settingsCtl.settings;
-    if (!s || !s.oauth_settings.enabled) return [];
-    const marks: Record<string, string> = {
-      google: "G",
-      github: "GH",
-      linkedin: "in",
-      facebook: "f"
-    };
-    return Object.entries(s.oauth_providers)
-      .filter(([, p]) => p.enabled)
-      .map(([id, p]) => ({
-        id,
-        name: p.provider_name,
-        mark: marks[id] ?? p.provider_name.slice(0, 2)
-      }));
+  private get availableProviders(): OAuthProviderOption[] {
+    return oauthProviders(this.settings ?? this.settingsCtl.settings, "link");
   }
 
   // ── sections ──────────────────────────────────────────────
@@ -699,28 +703,16 @@ export class SinglebaseAccountScreen extends SinglebaseFormBase {
             : html`
                 <div class="edit-card">
                   <div class="field">
-                    <label for=${this.uid("curpass")}>${this.msg.currentPasswordLabel}</label>
-                    <input
-                      id=${this.uid("curpass")}
-                      type="password"
-                      part="input"
-                      .value=${this.curPass}
-                      placeholder=${this.msg.passwordPlaceholder}
-                      ?disabled=${this.submitting}
-                      @input=${(e: Event) => {
-                        this.curPass = (e.target as HTMLInputElement).value;
-                        this.newPassError = "";
-                      }}
-                    />
-                  </div>
-                  <div class="field">
                     <label for=${this.uid("newpass")}>${this.msg.newPasswordLabel}</label>
                     <input
                       id=${this.uid("newpass")}
                       type="password"
                       part="input"
                       .value=${this.newPass}
-                      placeholder=${this.msg.newPasswordPlaceholder}
+                      placeholder=${newPasswordPlaceholder(
+                        (this.settings ?? this.settingsCtl.settings)?.auth_settings.password_policy,
+                        this.msg
+                      )}
                       aria-invalid=${this.newPassError ? "true" : "false"}
                       ?disabled=${this.submitting}
                       @input=${(e: Event) => {
@@ -730,7 +722,9 @@ export class SinglebaseAccountScreen extends SinglebaseFormBase {
                     />
                   </div>
                   <div class="field">
-                    <label for=${this.uid("confirmpass")}>Confirm new password</label>
+                    <label for=${this.uid("confirmpass")}
+                      >${this.msg.confirmNewPasswordLabel}</label
+                    >
                     <input
                       id=${this.uid("confirmpass")}
                       type="password"
@@ -744,6 +738,7 @@ export class SinglebaseAccountScreen extends SinglebaseFormBase {
                         this.newPassError = "";
                       }}
                     />
+                    ${renderPasswordRules((this.settings ?? this.settingsCtl.settings)?.auth_settings.password_policy, this.msg)}
                     ${this.newPassError ? html`<p class="err">${this.newPassError}</p>` : nothing}
                   </div>
                   <div class="edit-actions">
@@ -810,7 +805,7 @@ export class SinglebaseAccountScreen extends SinglebaseFormBase {
               <button
                 type="button"
                 class="tile"
-                aria-label=${`Connect ${p.name}`}
+                aria-label=${this.msg.connectProviderLabel.replace("{name}", p.name)}
                 ?disabled=${this.submitting}
                 @click=${() => this.onConnectProvider(p.id)}
               >
@@ -821,10 +816,6 @@ export class SinglebaseAccountScreen extends SinglebaseFormBase {
             `
           )}
         </div>
-        <p class="disabled-note">
-          ${this.msg.notYetSupported} — listing or disconnecting linked providers is not part of the
-          current API.
-        </p>
       </div>
     `;
   }
@@ -853,7 +844,7 @@ export class SinglebaseAccountScreen extends SinglebaseFormBase {
   }
 
   protected override render() {
-    if (!this.user) return html`<p class="disabled-note">Not signed in.</p>`;
+    if (!this.user) return html`<p class="disabled-note">${this.msg.notSignedInNote}</p>`;
 
     return html`
       <div class="acct-root">

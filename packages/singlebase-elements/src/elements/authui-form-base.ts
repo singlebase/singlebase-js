@@ -1,7 +1,7 @@
 import { html } from "lit";
 import { state } from "lit/decorators.js";
-import { SinglebaseAuthError, mapErrorToHint } from "@singlebase/singlebase-sdk";
 import { SinglebaseElementBase } from "./authui-base.js";
+import { describeAuthError } from "../utils/auth-errors.js";
 
 export type FormPhase = "idle" | "submitting" | "success" | "error";
 
@@ -53,13 +53,7 @@ export abstract class SinglebaseFormBase extends SinglebaseElementBase {
   }
 
   protected describeError(error: unknown): string {
-    if (error instanceof SinglebaseAuthError) {
-      const hint = mapErrorToHint(error.code);
-      if (hint === "disable_retry_show_rate_limited") return this.msg.rateLimitedMessage;
-      if (hint === "generic_credentials_message") return this.msg.genericErrorMessage;
-      return this.msg.genericErrorMessage;
-    }
-    return this.msg.genericErrorMessage;
+    return describeAuthError(error, this.msg);
   }
 
   protected get submitting(): boolean {
@@ -74,8 +68,8 @@ export abstract class SinglebaseFormBase extends SinglebaseElementBase {
         aria-live="polite"
         style="position:absolute;width:1px;height:1px;overflow:hidden;"
       >
-        ${this.phase === "submitting" ? "Submitting…" : ""}
-        ${this.phase === "success" ? "Done." : ""}
+        ${this.phase === "submitting" ? this.msg.submittingStatus : ""}
+        ${this.phase === "success" ? this.msg.doneStatus : ""}
       </div>
       ${this.formError ? html`<p class="banner" role="alert">${this.formError}</p>` : null}
       ${this.noticeMessage ? html`<p class="notice" role="status">${this.noticeMessage}</p>` : null}

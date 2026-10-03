@@ -54,9 +54,16 @@ export interface SinglebaseAuthMessages {
   passwordPlaceholder: string;
   newPasswordLabel: string;
   newPasswordPlaceholder: string;
+  newPasswordPlaceholderPlain: string;
+  passwordRulesLabel: string;
+  passwordRuleLength: string;
+  passwordRuleMinLength: string;
+  passwordRuleLowercase: string;
+  passwordRuleUppercase: string;
+  passwordRuleNumber: string;
+  passwordRuleSymbol: string;
   confirmPasswordLabel: string;
   confirmPasswordPlaceholder: string;
-  currentPasswordLabel: string;
   firstNameLabel: string;
   firstNamePlaceholder: string;
   lastNameLabel: string;
@@ -74,7 +81,6 @@ export interface SinglebaseAuthMessages {
   footActionSignUp: string;
   resendQuestion: string;
   resendCta: string;
-  oauthPrimaryLabel: string;
   oauthContinueWith: string;
 
   // blocked
@@ -134,10 +140,28 @@ export interface SinglebaseAuthMessages {
   codeSentNeutral: string;
   invalidEmailError: string;
   requiredError: string;
-  passwordMinError: string;
+  passwordTooShortError: string;
+  passwordTooLongError: string;
+  passwordNeedsLowercaseError: string;
+  passwordNeedsUppercaseError: string;
+  passwordNeedsNumberError: string;
+  passwordNeedsSymbolError: string;
+  invalidPasswordMessage: string;
   passwordMatchError: string;
+  invalidCodeError: string;
+  invalidCredentialsError: string;
+  codeResentNotice: string;
+  confirmNewPasswordLabel: string;
+  notSignedInNote: string;
+  connectProviderLabel: string;
+  digitLabel: string;
+  accountCreatedNotice: string;
+  inviteCodeLabel: string;
+  submittingStatus: string;
+  doneStatus: string;
   codeIncompleteError: string;
   invalidPhoneError: string;
+  firstNameRequiredError: string;
   notYetSupported: string;
 
   // already-signed-in interstitial
@@ -168,6 +192,13 @@ export interface SinglebaseAuthMessages {
   oauthCallbackTitle: string;
   oauthCallbackSub: string;
   oauthDenied: string;
+  oauthRetryMessage: string;
+  oauthUnavailableMessage: string;
+  oauthVerifiedEmailMessage: string;
+  providerConnectedNotice: string;
+  signInToLinkMessage: string;
+  providerAlreadyLinkedMessage: string;
+  oauthNoAccountMessage: string;
 }
 
 export const defaultMessages: SinglebaseAuthMessages = {
@@ -203,7 +234,7 @@ export const defaultMessages: SinglebaseAuthMessages = {
   emailMethodMetaSignUp: "Create with an address",
   emailMethodMetaOtp: "One-time code",
   oauthMethodTitle: "Single sign-on",
-  oauthMethodMeta: "Google, GitHub, and more",
+  oauthMethodMeta: "Use an account you already have",
 
   fullNameLabel: "Full name",
   fullNamePlaceholder: "Ada Lovelace",
@@ -212,10 +243,17 @@ export const defaultMessages: SinglebaseAuthMessages = {
   passwordLabel: "Password",
   passwordPlaceholder: "••••••••",
   newPasswordLabel: "New password",
-  newPasswordPlaceholder: "At least 10 characters",
+  newPasswordPlaceholder: "At least {min} characters",
+  newPasswordPlaceholderPlain: "Choose a password",
+  passwordRulesLabel: "Password requirements",
+  passwordRuleLength: "{min}–{max} characters",
+  passwordRuleMinLength: "At least {min} characters",
+  passwordRuleLowercase: "A lowercase letter",
+  passwordRuleUppercase: "An uppercase letter",
+  passwordRuleNumber: "A number",
+  passwordRuleSymbol: "A symbol",
   confirmPasswordLabel: "Confirm password",
   confirmPasswordPlaceholder: "Repeat it",
-  currentPasswordLabel: "Current password",
   firstNameLabel: "First name",
   firstNamePlaceholder: "Ada",
   lastNameLabel: "Last name",
@@ -232,7 +270,6 @@ export const defaultMessages: SinglebaseAuthMessages = {
   footActionSignUp: "Sign in",
   resendQuestion: "Did not get it?",
   resendCta: "Resend code",
-  oauthPrimaryLabel: "Continue with Google",
   oauthContinueWith: "Continue with",
 
   blockedTitleDisabled: "Sign-in is turned off",
@@ -285,14 +322,32 @@ export const defaultMessages: SinglebaseAuthMessages = {
   changeUsernameCta: "Send verification code",
 
   genericErrorMessage: "Something went wrong. Please try again.",
-  rateLimitedMessage: "Too many attempts. Try again in 5 minutes or reset your password.",
+  rateLimitedMessage: "Too many attempts. Wait a few minutes, then try again.",
   codeSentNeutral: "If an eligible account exists, a code has been sent.",
   invalidEmailError: "Enter a valid email address.",
   requiredError: "This cannot be empty.",
-  passwordMinError: "Use at least 10 characters.",
+  passwordTooShortError: "Use at least {min} characters.",
+  passwordTooLongError: "Use at most {max} characters.",
+  passwordNeedsLowercaseError: "Include a lowercase letter.",
+  passwordNeedsUppercaseError: "Include an uppercase letter.",
+  passwordNeedsNumberError: "Include a number.",
+  passwordNeedsSymbolError: "Include a symbol.",
+  invalidPasswordMessage: "That password doesn't meet the requirements.",
   passwordMatchError: "Both passwords must match.",
+  invalidCodeError: "That code is not valid. Check it and try again.",
+  invalidCredentialsError: "That email and password do not match.",
+  codeResentNotice: "New code sent.",
+  confirmNewPasswordLabel: "Confirm new password",
+  notSignedInNote: "Not signed in.",
+  connectProviderLabel: "Connect {name}",
+  digitLabel: "Digit {n}",
+  accountCreatedNotice: "Account created. Sign in to continue.",
+  inviteCodeLabel: "Invite code",
+  submittingStatus: "Submitting…",
+  doneStatus: "Done.",
   codeIncompleteError: "Enter all six digits.",
   invalidPhoneError: "Enter a valid phone number.",
+  firstNameRequiredError: "Enter your first name.",
   notYetSupported: "Not yet supported",
 
   alreadySignedInTitle: "You are already signed in",
@@ -317,7 +372,17 @@ export const defaultMessages: SinglebaseAuthMessages = {
 
   oauthCallbackTitle: "Finishing sign-in",
   oauthCallbackSub: "One moment while we complete your sign-in.",
-  oauthDenied: "Sign-in was cancelled or denied."
+  oauthDenied: "Sign-in was cancelled or denied.",
+  oauthRetryMessage: "We couldn't finish signing you in with that provider. Please try again.",
+  oauthUnavailableMessage: "This sign-in option isn't available right now.",
+  oauthVerifiedEmailMessage:
+    "Your provider account needs a verified email address. Verify it with the provider, then try again.",
+  providerConnectedNotice: "{name} is now connected to your account.",
+  signInToLinkMessage:
+    "An account with this email already exists. Sign in first, then connect the provider from your account.",
+  providerAlreadyLinkedMessage: "That provider account is already connected to another account.",
+  oauthNoAccountMessage:
+    "There's no account for that provider yet. Create an account first, or sign in another way."
 };
 
 export function resolveMessages(

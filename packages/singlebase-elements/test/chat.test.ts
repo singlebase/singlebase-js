@@ -263,7 +263,10 @@ describe("<singlebase-chat> sources", () => {
 
   it("attaches text files as retrieval for that turn only", async () => {
     const client = llmClient();
-    const el = await mount(html`<singlebase-chat auto-title="false"></singlebase-chat>`, client);
+    const el = await mount(
+      html`<singlebase-chat attachments-mode="retrieval" auto-title="false"></singlebase-chat>`,
+      client
+    );
     await (el as any).addFiles([
       new File(["# Notes\nhello"], "notes.md", { type: "text/markdown" }),
       new File(["a,b\n1,2"], "data.csv", { type: "text/csv" }),
@@ -276,8 +279,8 @@ describe("<singlebase-chat> sources", () => {
     await until(settled(el));
     const payload = client.calls.find((c) => c.method === "chat")!.payload;
     expect(payload.retrieval).to.deep.equal([
-      { type: "csv", data: "a,b\n1,2" },
-      { type: "docs", payload: { documents: [{ title: "notes.md", content: "# Notes\nhello" }] } }
+      { source: "csv", data: "a,b\n1,2" },
+      { source: "docs", payload: { documents: [{ title: "notes.md", content: "# Notes\nhello" }] } }
     ]);
     expect(payload.metadata).to.deep.equal({ attachments: ["notes.md", "data.csv"] });
 

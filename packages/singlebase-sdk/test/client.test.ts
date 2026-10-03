@@ -228,3 +228,37 @@ describe("connection options", () => {
     expect("X-API-Key" in calls[0].headers).toBe(false);
   });
 });
+
+describe("auth.startOAuth", () => {
+  const oauthFetch = (seen: any[]) =>
+    makeFetch((body) => {
+      seen.push(body);
+      if (body.operation === "auth.nonce") return { nonce: "made-here" };
+      return { oauth_redirect_url: "https://provider.example/auth", oauth_provider: "google" };
+    });
+
+  it("returns the nonce it created, so completeOAuth() can use it", async () => {
+    const seen: any[] = [];
+    const sbc = SinglebaseClient(OPTIONS(oauthFetch(seen)));
+
+    const result = await sbc.auth.startOAuth({ provider: "google" });
+
+    expect(result).toEqual({
+      oauth_redirect_url: "https://provider.example/auth",
+      oauth_provider: "google",
+      nonce: "made-here"
+    });
+    expect(seen.map((b) => b.operation)).toEqual(["auth.nonce", "auth.oauth_connect"]);
+    expect(seen[1].payload.nonce).toBe("made-here");
+  });
+
+  it("returns the nonce it was given, without making another", async () => {
+    const seen: any[] = [];
+    const sbc = SinglebaseClient(OPTIONS(oauthFetch(seen)));
+
+    const result = await sbc.auth.startOAuth({ provider: "github", nonce: "mine" });
+
+    expect(result.nonce).toBe("mine");
+    expect(seen.map((b) => b.operation)).toEqual(["auth.oauth_connect"]);
+  });
+});

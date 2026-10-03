@@ -13,8 +13,20 @@ import { SettingsController } from "../controllers/settings-controller.js";
 import { EventBridge } from "../controllers/event-bridge.js";
 import { brandingStyles } from "../styles/branding.js";
 import { renderBranding } from "../utils/branding.js";
+import { linkStorageKey, oauthProviders, oauthReady } from "../utils/oauth.js";
+import { describeAuthError } from "../utils/auth-errors.js";
+import { newPasswordPlaceholder, passwordError, renderPasswordRules } from "../utils/password.js";
 import "./authui-account.js";
 import "./authui-buttons.js";
+
+/** The `error` value of a cancelled OAuth return. */
+const OAUTH_DENIED = "oauth_denied";
+
+/** The parameter a failed OAuth return carries its error code in. */
+const OAUTH_ERROR = "oauth_error";
+
+/** An OAuth error code: upper-case letters and underscores, nothing else. */
+const OAUTH_ERROR_CODE = /^[A-Z][A-Z0-9_]{0,63}$/;
 
 /** Screens a signed-out visitor may reach. */
 export type GuestScreen = "signin" | "signup" | "forgot" | "verify" | "otp" | "newpass" | "invite";
@@ -274,7 +286,6 @@ export class SinglebaseAuthScreen extends SinglebaseElementBase {
   @state() private accessor emailError = "";
   @state() private accessor passError = "";
   @state() private accessor newPassError = "";
-  @state() private accessor attempts = 0;
   @state() private accessor needsMfaCode = false;
 
   private settingsCtl = new SettingsController(this);
@@ -360,6 +371,7 @@ export class SinglebaseAuthScreen extends SinglebaseElementBase {
         allowEmailSignup: this.allowEmailSignup && this.allowAccountCreation,
         allowEmailOtp: this.allowEmailOtp,
         allowOauth: this.allowOauth,
+        allowRecovery: this.allowEmailSignin,
         mfa: false
       };
     }
@@ -372,7 +384,10 @@ export class SinglebaseAuthScreen extends SinglebaseElementBase {
       allowEmailSignin: a.allow_signin && this.allowEmailSignin,
       allowEmailSignup: a.allow_signup && this.allowEmailSignup && this.allowAccountCreation,
       allowEmailOtp: this.allowEmailOtp && a.allow_signin && !mfa,
-      allowOauth: s.oauth_settings.enabled && this.allowOauth,
+      allowOauth: oauthReady(s) && this.allowOauth,
+      // Email recovery is offered only when the project verifies it by code.
+      allowRecovery:
+        a.allow_signin && this.allowEmailSignin && a.password_recovery_verification === "email_otp",
       mfa
     };
   }
@@ -392,9 +407,14 @@ export class SinglebaseAuthScreen extends SinglebaseElementBase {
    * fallbacks below additionally reflect what the project has enabled.
    */
   private get activeScreen(): Screen {
-    if (this.isOAuthCallback) return "oauth-callback";
-
     const authenticated = this.auth.state.status === "authenticated";
+
+    // The callback screen stays up while the exchange runs, and after a failed
+    // return for a signed-out visitor (it offers a way back). A signed-in one
+    // sees the outcome on the account view instead.
+    if (this.isOAuthCallback || this.callbackPhase === "working") return "oauth-callback";
+    if (this.callbackPhase === "failed" && !authenticated) return "oauth-callback";
+
     const requested = this.requestedScreen;
 
     if (isProtectedScreen(requested)) {
@@ -414,7 +434,7 @@ export class SinglebaseAuthScreen extends SinglebaseElementBase {
     const c = this.cfg;
     let screen = requested as GuestScreen;
     if (screen === "signup" && !c.allowEmailSignup) screen = "signin";
-    if ((screen === "forgot" || screen === "newpass") && !c.allowEmailSignin) screen = "signin";
+    if ((screen === "forgot" || screen === "newpass") && !c.allowRecovery) screen = "signin";
     if (screen === "otp" && !c.allowEmailOtp) screen = "signin";
     if (screen === "signin" && !c.allowEmailSignin && c.allowEmailOtp) screen = "otp";
     return screen;
@@ -456,9 +476,15 @@ export class SinglebaseAuthScreen extends SinglebaseElementBase {
     return true;
   }
 
+  /**
+   * Only the OAuth return counts: `?access_code=`, `?error=oauth_denied` or
+   * `?oauth_error=<CODE>`. Any other `?error=` belongs to the host page.
+   */
   private get isOAuthCallback(): boolean {
     const params = new URLSearchParams(globalThis.location?.search ?? "");
-    return params.has("access_code") || params.has("error");
+    return (
+      params.has("access_code") || params.get("error") === OAUTH_DENIED || params.has(OAUTH_ERROR)
+    );
   }
 
   // ── OAuth callback ────────────────────────────────────────
@@ -469,13 +495,20 @@ export class SinglebaseAuthScreen extends SinglebaseElementBase {
 
   @state() private accessor callbackDone = false;
 
+  /** Where the OAuth return stands once its URL has been cleaned. */
+  @state() private accessor callbackPhase: "" | "working" | "failed" = "";
+
+  /** "{name} is now connected", after a provider link completes. */
+  @state() private accessor linkNotice = "";
+
   /** Strips the provider's parameters so a reload cannot replay the exchange. */
   private cleanCallbackUrl(): void {
     const here = globalThis.location?.href;
     if (!here || !globalThis.history) return;
     const url = new URL(here);
     url.searchParams.delete("access_code");
-    url.searchParams.delete("error");
+    url.searchParams.delete(OAUTH_ERROR);
+    if (url.searchParams.get("error") === OAUTH_DENIED) url.searchParams.delete("error");
     globalThis.history.replaceState({}, "", url.toString());
   }
 
@@ -485,35 +518,53 @@ export class SinglebaseAuthScreen extends SinglebaseElementBase {
    */
   private async handleOAuthCallback(): Promise<void> {
     if (this.callbackDone) return;
-    this.callbackDone = true;
 
     const params = new URLSearchParams(globalThis.location?.search ?? "");
     const accessCode = params.get("access_code");
-    const denied = params.get("error");
+    const denied = params.get("error") === OAUTH_DENIED;
+    const failed = params.get(OAUTH_ERROR);
     const client = this.resolvedClient;
 
-    if (denied) {
+    // Wait for a client before using up the single-use code.
+    if (accessCode && !client) return;
+    this.callbackDone = true;
+
+    if (denied || failed || !accessCode || !client) {
+      globalThis.sessionStorage?.removeItem(this.nonceStorageKey);
+      globalThis.sessionStorage?.removeItem(linkStorageKey(this.nonceStorageKey));
       this.cleanCallbackUrl();
-      this.banner = this.msg.oauthDenied;
+      this.banner = denied ? this.msg.oauthDenied : this.describeOAuthError(failed ?? "");
+      this.callbackPhase = "failed";
       return;
     }
 
-    if (!accessCode || !client) return;
-
     const nonce = globalThis.sessionStorage?.getItem(this.nonceStorageKey);
+    const linkKey = linkStorageKey(this.nonceStorageKey);
+    const linking = globalThis.sessionStorage?.getItem(linkKey);
+    globalThis.sessionStorage?.removeItem(linkKey);
     this.cleanCallbackUrl();
 
     if (!nonce) {
       // No nonce means this response cannot be tied to a flow this browser
       // started, so it is not safe to exchange.
       this.banner = this.msg.genericErrorMessage;
+      this.callbackPhase = "failed";
       return;
     }
 
+    this.callbackPhase = "working";
     await this.withLoading(async () => {
       await client.completeOAuth({ access_code: accessCode, nonce }, this.signal());
       globalThis.sessionStorage?.removeItem(this.nonceStorageKey);
+      if (linking) {
+        // A link keeps the same session; say what changed on the account view.
+        const settings = this.settings ?? this.settingsCtl.settings;
+        const name =
+          oauthProviders(settings, "link").find((p) => p.id === linking)?.name ?? linking;
+        this.linkNotice = this.msg.providerConnectedNotice.replace("{name}", name);
+      }
     });
+    this.callbackPhase = this.banner ? "failed" : "";
   }
 
   /** The small logo above a screen title: image when given one, else text. */
@@ -560,7 +611,14 @@ export class SinglebaseAuthScreen extends SinglebaseElementBase {
         }
         ${
           this.banner
-            ? html`<button type="button" class="ghost" @click=${() => this.goto("signin")}>
+            ? html`<button
+                type="button"
+                class="ghost"
+                @click=${() => {
+                  this.callbackPhase = "";
+                  this.goto("signin");
+                }}
+              >
                 <span>${this.msg.backCta}</span>
               </button>`
             : nothing
@@ -601,11 +659,39 @@ export class SinglebaseAuthScreen extends SinglebaseElementBase {
   }
 
   private describeError(error: unknown): string {
-    if (error instanceof SinglebaseAuthError) {
-      if (error.code === "AUTH_RATE_LIMITED") return this.msg.rateLimitedMessage;
-      if (error.code === "INVALID_TOKEN") return "That code is not valid. Check it and try again.";
-    }
-    return this.msg.genericErrorMessage;
+    return describeAuthError(error, this.msg);
+  }
+
+  /**
+   * The message for a code the backend sent back on the redirect. The code is
+   * only ever looked up, never shown, so a crafted URL can't put text on the page.
+   */
+  private describeOAuthError(code: string): string {
+    if (!OAUTH_ERROR_CODE.test(code)) return this.msg.genericErrorMessage;
+    // On an OAuth return, "invalid credentials" means no account has that provider.
+    if (code === "INVALID_CREDENTIALS") return this.msg.oauthNoAccountMessage;
+    return describeAuthError(
+      new SinglebaseAuthError({ type: "AUTH_ERROR", status: 400, message: code }),
+      this.msg
+    );
+  }
+
+  /** The requirements hint under a field that creates a password. */
+  private get passwordHint() {
+    const settings = this.settings ?? this.settingsCtl.settings;
+    return renderPasswordRules(settings?.auth_settings.password_policy, this.msg);
+  }
+
+  /** The placeholder for a field that creates a password. */
+  private get newPasswordHint(): string {
+    const settings = this.settings ?? this.settingsCtl.settings;
+    return newPasswordPlaceholder(settings?.auth_settings.password_policy, this.msg);
+  }
+
+  /** The project's password rules, checked wherever a password is created. */
+  private checkNewPassword(password: string): string {
+    const settings = this.settings ?? this.settingsCtl.settings;
+    return passwordError(password, settings?.auth_settings.password_policy, this.msg);
   }
 
   private get codeValue() {
@@ -656,8 +742,9 @@ export class SinglebaseAuthScreen extends SinglebaseElementBase {
     }
 
     if (screen === "newpass") {
-      if (this.newPass.length < 10) {
-        this.newPassError = this.msg.passwordMinError;
+      const problem = this.checkNewPassword(this.newPass);
+      if (problem) {
+        this.newPassError = problem;
         return;
       }
       if (this.newPass !== this.confirmPass) {
@@ -676,16 +763,15 @@ export class SinglebaseAuthScreen extends SinglebaseElementBase {
     }
 
     if (screen === "invite") {
-      if (!this.firstName.trim() || !this.lastName.trim()) {
-        this.banner = "Enter your first and last name.";
-        return;
-      }
-      if (this.phone.replace(/\D/g, "").length < 7) {
+      // Names and phone are optional here; check the phone only when given.
+      const phone = this.phone.trim();
+      if (phone && phone.replace(/\D/g, "").length < 7) {
         this.banner = this.msg.invalidPhoneError;
         return;
       }
-      if (this.password.length < 10) {
-        this.passError = this.msg.passwordMinError;
+      const problem = this.checkNewPassword(this.password);
+      if (problem) {
+        this.passError = problem;
         return;
       }
       const code = this.inviteCode || this.codeValue;
@@ -701,10 +787,22 @@ export class SinglebaseAuthScreen extends SinglebaseElementBase {
             purpose: "invite",
             code,
             password: this.password,
-            phone: this.phone
+            ...(phone ? { phone } : {})
           },
           this.signal()
         );
+        // auth.invite takes no names, so save any that were typed to the new
+        // account. It's a nicety: a failure here doesn't undo the invite.
+        const first = this.firstName.trim();
+        const last = this.lastName.trim();
+        if (first || last) {
+          await client
+            .updateAccount(
+              { ...(first ? { first_name: first } : {}), ...(last ? { last_name: last } : {}) },
+              this.signal()
+            )
+            .catch(() => undefined);
+        }
       });
       return;
     }
@@ -713,10 +811,17 @@ export class SinglebaseAuthScreen extends SinglebaseElementBase {
       this.stepped &&
       ((screen === "signup" && this.step < 2) || (screen === "signin" && this.step < 1))
     ) {
-      if (!this.email.includes("@")) {
+      // Check the field this step shows: sign-up asks for the name first.
+      if (screen === "signup" && this.step === 0) {
+        if (!this.name.trim()) {
+          this.banner = this.msg.firstNameRequiredError;
+          return;
+        }
+      } else if (!this.email.includes("@")) {
         this.emailError = this.msg.invalidEmailError;
         return;
       }
+      this.banner = "";
       this.step += 1;
       return;
     }
@@ -727,18 +832,26 @@ export class SinglebaseAuthScreen extends SinglebaseElementBase {
     }
 
     if (screen === "signup") {
-      if (this.password.length < 8) {
-        this.passError = "Password must be at least 8 characters.";
+      // Checked in field order: name, then password.
+      // One name field: the first word is the first name, the rest (if any) the last.
+      const [first = "", ...rest] = this.name.trim().split(/\s+/);
+      if (!first) {
+        this.banner = this.msg.firstNameRequiredError;
         return;
       }
-      const [first, ...rest] = this.name.trim().split(/\s+/);
+      const problem = this.checkNewPassword(this.password);
+      if (problem) {
+        this.passError = problem;
+        return;
+      }
+      const last = rest.join(" ");
       await this.withLoading(async () => {
         const result = await client.signUp(
           {
             email: this.email,
             password: this.password,
-            first_name: first || this.name,
-            last_name: rest.join(" ") || "—"
+            first_name: first,
+            ...(last ? { last_name: last } : {})
           },
           this.signal()
         );
@@ -747,7 +860,7 @@ export class SinglebaseAuthScreen extends SinglebaseElementBase {
           next_operation: result.next_operation
         });
         this.setScreen("signin", {
-          notice: "Account created. Sign in to continue.",
+          notice: this.msg.accountCreatedNotice,
           step: 0,
           password: "",
           needsMfaCode: next === "signin_with_code"
@@ -756,11 +869,9 @@ export class SinglebaseAuthScreen extends SinglebaseElementBase {
       return;
     }
 
-    // signin
-    if (this.password.length < 8) {
-      this.attempts += 1;
-      this.passError = "Password must be at least 8 characters.";
-      this.banner = this.attempts >= 3 ? this.msg.rateLimitedMessage : "";
+    // signin: an existing password is checked by the server, not the policy.
+    if (!this.password) {
+      this.passError = this.msg.requiredError;
       return;
     }
     await this.withLoading(async () => {
@@ -782,11 +893,8 @@ export class SinglebaseAuthScreen extends SinglebaseElementBase {
           return;
         }
         if (error instanceof SinglebaseAuthError && error.code === "INVALID_CREDENTIALS") {
-          this.attempts += 1;
-          this.banner =
-            this.attempts >= 3
-              ? this.msg.rateLimitedMessage
-              : "That email and password do not match.";
+          // The server rate-limits for real (AUTH_RATE_LIMITED); don't guess here.
+          this.banner = this.msg.invalidCredentialsError;
           return;
         }
         throw error;
@@ -855,7 +963,7 @@ export class SinglebaseAuthScreen extends SinglebaseElementBase {
     const purpose = this.verifyNext === "newpass" ? "password_reset" : "signin";
     await this.withLoading(async () => {
       await client.requestCode({ email: this.email, purpose }, this.signal());
-      this.notice = "New code sent.";
+      this.notice = this.msg.codeResentNotice;
       this.code = ["", "", "", "", "", ""];
     });
   }
@@ -978,7 +1086,7 @@ export class SinglebaseAuthScreen extends SinglebaseElementBase {
     `;
   }
 
-  private renderPasswordField(id: string, showForgot: boolean) {
+  private renderPasswordField(id: string, showForgot: boolean, creating = false) {
     return html`
       <div class="field">
         <div class="label-row">
@@ -1000,7 +1108,7 @@ export class SinglebaseAuthScreen extends SinglebaseElementBase {
           type="password"
           part="input"
           .value=${this.password}
-          placeholder=${this.msg.passwordPlaceholder}
+          placeholder=${creating ? this.newPasswordHint : this.msg.passwordPlaceholder}
           aria-invalid=${this.passError ? "true" : "false"}
           ?disabled=${this.loading}
           @input=${(e: Event) => {
@@ -1009,6 +1117,7 @@ export class SinglebaseAuthScreen extends SinglebaseElementBase {
             this.banner = "";
           }}
         />
+        ${creating ? this.passwordHint : nothing}
         ${this.passError ? html`<p class="err">${this.passError}</p>` : nothing}
       </div>
     `;
@@ -1016,7 +1125,11 @@ export class SinglebaseAuthScreen extends SinglebaseElementBase {
 
   private renderCodeRow(small = false) {
     return html`
-      <div class=${small ? "code-row-sm" : "code-row"} role="group" aria-label="Verification code">
+      <div
+        class=${small ? "code-row-sm" : "code-row"}
+        role="group"
+        aria-label=${this.msg.codeLabel}
+      >
         ${this.code.map(
           (digit, i) => html`
             <input
@@ -1024,7 +1137,7 @@ export class SinglebaseAuthScreen extends SinglebaseElementBase {
               inputmode="numeric"
               maxlength="1"
               part="code-box"
-              aria-label=${`Digit ${i + 1}`}
+              aria-label=${this.msg.digitLabel.replace("{n}", String(i + 1))}
               autocomplete=${i === 0 ? "one-time-code" : "off"}
               .value=${digit}
               ?disabled=${this.loading}
@@ -1072,12 +1185,20 @@ export class SinglebaseAuthScreen extends SinglebaseElementBase {
           : nothing
       }
       ${showEmail ? this.renderEmailField(this.uid("email")) : nothing}
-      ${showPassword ? this.renderPasswordField(this.uid("pass"), c.allowEmailSignin && screen === "signin") : nothing}
+      ${
+        showPassword
+          ? this.renderPasswordField(
+              this.uid("pass"),
+              c.allowRecovery && screen === "signin",
+              screen === "signup"
+            )
+          : nothing
+      }
       ${
         this.needsMfaCode && screen === "signin"
           ? html`
               <div class="field">
-                <span class="label">Verification code</span>
+                <span class="label">${this.msg.codeLabel}</span>
                 ${this.renderCodeRow(true)}
               </div>
             `
@@ -1104,7 +1225,10 @@ export class SinglebaseAuthScreen extends SinglebaseElementBase {
       (screen === "signin" && c.allowEmailSignin) ||
       (screen === "signup" && c.allowEmailSignup) ||
       (screen === "otp" && c.allowEmailOtp);
-    const hasOauth = c.allowOauth;
+    // With settings loaded, show OAuth only when this screen has providers.
+    const settings = this.settings ?? this.settingsCtl.settings;
+    const providers = oauthProviders(settings, screen === "signup" ? "signup" : "signin");
+    const hasOauth = c.allowOauth && (!settings || providers.length > 0);
     if (!hasEmail && !hasOauth) return nothing;
 
     const showHeads = hasEmail && hasOauth;
@@ -1170,7 +1294,7 @@ export class SinglebaseAuthScreen extends SinglebaseElementBase {
       ? item(
           oauthOpen,
           this.msg.oauthMethodTitle,
-          this.msg.oauthMethodMeta,
+          providers.length ? providers.map((p) => p.name).join(", ") : this.msg.oauthMethodMeta,
           html`<singlebase-authui-buttons
             type="oauth"
             embedded
@@ -1226,7 +1350,7 @@ export class SinglebaseAuthScreen extends SinglebaseElementBase {
               type="password"
               part="input"
               .value=${this.newPass}
-              placeholder=${this.msg.newPasswordPlaceholder}
+              placeholder=${this.newPasswordHint}
               aria-invalid=${this.newPassError ? "true" : "false"}
               ?disabled=${this.loading}
               @input=${(e: Event) => {
@@ -1250,6 +1374,7 @@ export class SinglebaseAuthScreen extends SinglebaseElementBase {
                 this.newPassError = "";
               }}
             />
+            ${this.passwordHint}
             ${this.newPassError ? html`<p class="err">${this.newPassError}</p>` : nothing}
           </div>
         </div>
@@ -1267,7 +1392,7 @@ export class SinglebaseAuthScreen extends SinglebaseElementBase {
             this.inviteCode
               ? nothing
               : html`<div class="field">
-                  <span class="label">Invite code</span>
+                  <span class="label">${this.msg.inviteCodeLabel}</span>
                   ${this.renderCodeRow(true)}
                 </div>`
           }
@@ -1316,7 +1441,7 @@ export class SinglebaseAuthScreen extends SinglebaseElementBase {
               type="password"
               part="input"
               .value=${this.password}
-              placeholder=${this.msg.newPasswordPlaceholder}
+              placeholder=${this.newPasswordHint}
               aria-invalid=${this.passError ? "true" : "false"}
               ?disabled=${this.loading}
               @input=${(e: Event) => {
@@ -1324,6 +1449,7 @@ export class SinglebaseAuthScreen extends SinglebaseElementBase {
                 this.passError = "";
               }}
             />
+            ${this.passwordHint}
             ${this.passError ? html`<p class="err">${this.passError}</p>` : nothing}
           </div>
         </div>
@@ -1402,7 +1528,7 @@ export class SinglebaseAuthScreen extends SinglebaseElementBase {
         ${this.renderConsent()}
 
         <span class="sr-only" role="status" aria-live="polite">
-          ${this.loading ? "Submitting…" : ""}
+          ${this.loading ? this.msg.submittingStatus : ""}
         </span>
       </form>
     `;
@@ -1498,7 +1624,7 @@ export class SinglebaseAuthScreen extends SinglebaseElementBase {
       : nothing;
 
     return html`
-      <p class="hint" part="consent">
+      <p class="hint consent" part="consent">
         ${this.msg.consentPrefix}
         ${tos}${
           this.tosUrl && this.privacyUrl ? html` ${this.msg.consentJoin} ` : nothing
@@ -1507,11 +1633,20 @@ export class SinglebaseAuthScreen extends SinglebaseElementBase {
     `;
   }
 
+  /**
+   * The OAuth return is handled after the first render, not during it: state
+   * set while rendering is dropped, so the widget wouldn't leave the callback
+   * screen once the URL is cleaned.
+   */
+  protected override updated(changed: PropertyValues): void {
+    super.updated(changed);
+    if (this.activeScreen === "oauth-callback") void this.handleOAuthCallback();
+  }
+
   protected override render() {
     const screen = this.activeScreen;
 
     if (screen === "oauth-callback") {
-      void this.handleOAuthCallback();
       return this.panel(this.renderOAuthCallback());
     }
 
@@ -1519,7 +1654,12 @@ export class SinglebaseAuthScreen extends SinglebaseElementBase {
       // `no-account-view` is the SPA case: render nothing and let the host
       // route away on the signin event instead.
       if (this.noAccountView) return nothing;
+      // Only the outcome of an OAuth return shows here, never a guest screen's
+      // leftover message (such as "Account created").
+      const failed = this.callbackPhase === "failed" && this.banner;
       return this.panel(html`
+        ${failed ? html`<div class="banner" part="banner" role="alert">${this.banner}</div>` : nothing}
+        ${this.linkNotice ? html`<div class="notice" part="notice" role="status">${this.linkNotice}</div>` : nothing}
         <singlebase-authui-account
           theme=${ifDefined(this.theme)}
           density=${ifDefined(this.density)}

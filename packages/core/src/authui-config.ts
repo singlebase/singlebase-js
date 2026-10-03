@@ -31,9 +31,6 @@ export interface AuthUIConfig {
   signInTitle?: string;
   /** The "Auth by Singlebase" credit under the card. On unless set false. */
   branding?: boolean;
-  /** The credit's text and link. */
-  brandingText?: string;
-  brandingUrl?: string;
 
   // ── screens & behaviour ──────────────────────────────────
   initialScreen?: string;
@@ -75,8 +72,6 @@ export const AUTHUI_PROP_KEYS = [
   "brandFoot",
   "signInTitle",
   "branding",
-  "brandingText",
-  "brandingUrl",
   "initialScreen",
   "noAccountView",
   "redirectUrl",

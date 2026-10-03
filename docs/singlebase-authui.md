@@ -90,11 +90,34 @@ visitor gets `signin` instead.
 **Already signed in.** On a guest screen, a signed-in visitor sees
 *Continue* and *Sign out* rather than a form.
 
-**OAuth return.** Put a widget on your OAuth redirect page. It finishes the
-exchange and removes the one-time code from the URL.
+**OAuth return.** Put a widget on the page set as your project's OAuth
+redirect URL. It finishes the exchange and removes the one-time code from the
+URL. A failed attempt comes back as `?oauth_error=<CODE>` (or
+`?error=oauth_denied` when the person cancels), and the widget explains it:
+for example, that the email already has an account, or that the provider
+account is connected to someone else. This is your app's route, such as `https://app.example.com/auth/callback`,
+not the provider callback URL, which always points at the Singlebase backend.
 
-**Only what's enabled.** The widget shows only the sign-in methods your project
-has turned on. The `allow-*` attributes can hide more, never less.
+**Only what's enabled.** The widget follows your project's auth settings, and
+the `allow-*` attributes can hide more, never less:
+
+- **OAuth** shows when it's enabled *and* the project has a frontend return URL
+  (`oauth_settings.redirect_url`). Each provider is labelled with its
+  `provider_name` from the settings. Sign-in and sign-up follow their own
+  `allow_signin` / `allow_signup`. When OAuth sign-up is allowed, the sign-in
+  buttons also create an account for a first-time visitor.
+- **Forgot password** shows only when recovery is verified by email code
+  (`password_recovery_verification: "email_otp"`).
+
+**Required fields.** Sign-up needs a name, email and password. The first word
+of the name is the first name; the rest, if any, is the last name. Last name
+and phone are optional everywhere: sign-up, invites and the account view.
+
+**Passwords** follow the project's `password_policy` wherever one is created
+or changed (sign-up, reset, invite, account): its length range and any required
+lowercase, uppercase, number or symbol. Each of those fields has a small
+"Password requirements" hint, closed by default, that lists the rules. On
+submit, the first broken rule is shown under the field. Sign-in doesn't check the policy; the server decides.
 
 ### After sign-in
 
@@ -109,15 +132,22 @@ actual sign-in, not on a restored session.
 
 ### The account view
 
-- **Profile:** first name, last name and phone, edited in place.
+- **Profile:** first name (required), last name and phone, edited in place.
+  Only the fields that changed are saved.
 - **Photo:** *Add photo* / *Change* opens a picker for JPG, PNG or WebP. The
   upload sends `options.profile_photo = true`, the server sets it as the account
   photo, and the widget re-reads the account (`user.get`) to show it. A photo
   that fails to load falls back to initials.
 - **Email:** a two-step change. A code goes to the *current* address, then the
   code and the new address are confirmed together.
-- **Password:** requires the current password.
-- **Connected accounts:** connect an OAuth provider.
+- **Password:** set a new one, following the project's password policy. The
+  signed-in session authorizes it, so people who signed up with OAuth (and
+  have no password) can set one here.
+- **Connected accounts:** connect an OAuth provider to the signed-in account.
+  The browser goes to the provider and back to your OAuth redirect page, where
+  the widget finishes the link and shows "GitHub is now connected" (or the
+  error) on the account view. The session stays the same. Listing or
+  disconnecting linked providers isn't available in the API yet.
 
 ### Attributes
 
@@ -212,19 +242,22 @@ One auth action as a button.
 ```html
 <singlebase-authui-buttons type="signout"></singlebase-authui-buttons>
 <singlebase-authui-buttons type="oauth" intent="signin"></singlebase-authui-buttons>
-<singlebase-authui-buttons type="link" provider="github" provider-name="GitHub"></singlebase-authui-buttons>
+<singlebase-authui-buttons type="link" provider="github"></singlebase-authui-buttons>
 ```
 
 | Attribute | Default | |
 | --- | --- | --- |
 | `type` | `signout` | `signout`, `oauth` or `link` |
 | `intent` | `signin` | For `oauth`: `signin`, `signup` or `link` |
-| `provider` / `provider-name` | — | For `link` |
+| `provider` | — | For `link`: `google`, `github`, `facebook` or `linkedin` |
+| `provider-name` | the project's `provider_name` | For `link`: override the label |
 | `embedded` | off | Drop the element's own chrome |
 | `nonce-storage-key` | `singlebase-oauth-nonce` | For `oauth` and `link` |
 
 - **`oauth`** renders the providers your project has enabled, and nothing if there are none.
 - **`link`** only works while signed in; accounts are never merged by matching email.
+  If someone signs in with a provider whose email already has an account, they
+  are asked to sign in first and connect the provider from their account.
 - **`signout`** always clears local state, even if the server call fails.
 
 ---
@@ -329,7 +362,7 @@ singlebase-authui::part(button-primary) { text-transform: uppercase; }
 
 `title`, `input`, `button-primary`, `button-signout`, `banner`, `notice`,
 `consent`, `spinner`, `code-box`, `oauth-button`, `acc-item`, `logo`,
-`avatar`, `avatar-image`, `avatar-initials`, `text`.
+`avatar`, `avatar-image`, `avatar-initials`, `text`, `password-rules`.
 
 ---
 
@@ -434,5 +467,4 @@ import { defaultMessages } from "@singlebase/elements/authui"; // every key
 - **Provider linking:** explicit only. Accounts are never merged by email.
 
 **Not in this release:** two-factor authentication and account deletion are
-hidden. Listing or disconnecting connected providers isn't available; the
-account view says so.
+hidden. Listing or disconnecting connected providers isn't available yet.

@@ -87,14 +87,63 @@ the user is active, and kept in sync across tabs.
 | Operation | Method |
 | --- | --- |
 | `auth.settings` | `auth.getSettings()` |
-| `auth.signup` | `auth.signUp({ email, password, … })` |
+| `auth.signup` | `auth.signUp({ email, password, first_name, last_name?, phone? })` |
 | `auth.signin` | `auth.signIn({ email, password })`, or with a code; `auth.acceptInvite(…)` |
 | `auth.refresh` | `auth.refreshSession()` — automatic |
 | `auth.signout` | `auth.logout()` |
 | `auth.request_code` | `auth.requestCode({ email, purpose })` |
 | `auth.confirm_code` | `auth.resetPassword(…)`, `auth.changeEmail(…)` |
 | `auth.change_password` | `auth.changePassword({ password })` |
-| OAuth | `auth.startOAuth({ provider, intent })`, `auth.completeOAuth(…)` |
+| OAuth | `auth.startOAuth({ provider, intent })`, `auth.completeOAuth({ access_code, nonce })` |
+
+**Sign-up** needs `email`, `password` and `first_name`. `last_name` and `phone`
+are optional.
+
+**Read the settings at runtime** (`auth.getSettings()`) instead of assuming
+what a project allows:
+
+- **Password recovery** is offered only when
+  `auth_settings.password_recovery_verification` is `"email_otp"`.
+- **OAuth** is available only when `oauth_settings.enabled` is true *and*
+  `oauth_settings.redirect_url` is set. List the `oauth_providers` whose
+  `enabled` is true, labelled with their `provider_name`. Sign-in and sign-up
+  also follow `oauth_settings.allow_signin` / `allow_signup`.
+
+**OAuth flow.** Providers are `google`, `github`, `facebook` and `linkedin`.
+
+1. `auth.startOAuth({ provider, intent })` returns `{ oauth_redirect_url, nonce }`.
+   Keep the `nonce` in `sessionStorage` (step 3 needs it), then send the
+   browser to `oauth_redirect_url`. `intent` is `signin` (default), `signup` or
+   `link` (signed in only; accounts are never merged by email). `signup` also
+   signs in someone whose provider account is already known, while `signin`
+   refuses a provider account that has no Singlebase account yet.
+2. The backend handles the provider callback, then redirects to your
+   `redirect_url` with `?access_code=…`, `?error=oauth_denied` (cancelled), or
+   `?oauth_error=<CODE>` (refused; the codes are below).
+3. `auth.completeOAuth({ access_code, nonce })` exchanges the code for a
+   session. Remove the parameters from the URL afterwards.
+
+The redirect URL is your app's route (such as
+`https://app.example.com/auth/callback`). It's not the URL you register with
+the provider, which always points at the Singlebase backend. The
+[`<singlebase-authui>`](./singlebase-authui.md) widget runs this whole flow for
+you.
+
+OAuth errors to handle:
+
+| Code | Meaning |
+| --- | --- |
+| `VERIFIED_PROVIDER_EMAIL_REQUIRED` | The provider account has no verified email |
+| `SIGN_IN_TO_LINK_PROVIDER` | The email already has an account: sign in, then connect the provider |
+| `PROVIDER_ALREADY_LINKED` | That provider account is connected to another account |
+| `INVALID_CREDENTIALS` | (Sign-in) no account has that provider account |
+| `OAUTH_VERIFICATION_FAILED`, `INVALID_NONCE`, `OAUTH_FAILED` | Start again |
+| `OAUTH_SIGNIN_DISABLED`, `OAUTH_SIGNUP_DISABLED` | Hide OAuth for that mode |
+| `MISSING_OAUTH_CREDENTIALS` | The project's provider setup is incomplete |
+
+Linking connects the provider account to the signed-in account whatever its
+email is. `auth.changePassword({ password })` needs only the new password, so
+accounts created with OAuth can set one.
 
 ```js
 sbc.isAuthenticated();                          // boolean
@@ -111,7 +160,7 @@ someone else. Administrative changes live under `sbc.users`.
 | Operation | Call |
 | --- | --- |
 | `user.get` | `sbc.user.get()` — or `sbc.auth.getAccount()`, which also refreshes the session's profile |
-| `user.update` | `sbc.user.update({ first_name, … })` — or `sbc.auth.updateAccount(…)` |
+| `user.update` | `sbc.user.update({ first_name, … })` — or `sbc.auth.updateAccount(…)`. Send only the fields that changed; every field is optional |
 
 ### `sbc.data` — documents
 

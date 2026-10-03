@@ -135,11 +135,11 @@
     auth_settings: {
       enabled: true, allow_signin: true, allow_signup: true,
       identifier: ["email"], signin_method: "password", second_factor: null,
-      signup_verify_email: false, account_update_verification: null,
+      signup_verify_email: false, account_update_verification: null, password_recovery_verification: "email_otp",
       password_policy: { NAME: "MEDIUM", LENGTH: [8, 64], SYMBOLS: false, NUMBERS: true, LOWERCASE: false, UPPERCASE: false },
       ...over.auth_settings
     },
-    oauth_settings: { enabled: true, allow_signin: true, allow_signup: true, ...over.oauth_settings },
+    oauth_settings: { enabled: true, allow_signin: true, allow_signup: true, redirect_url: "https://app.example.com/auth/callback", ...over.oauth_settings },
     oauth_providers: {
       google: { enabled: true, type: "client", name: "google", provider_name: "Google" },
       github: { enabled: true, type: "client", name: "github", provider_name: "GitHub" },
